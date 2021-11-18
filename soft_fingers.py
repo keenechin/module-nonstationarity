@@ -6,28 +6,37 @@ from pynput import keyboard
 
 
 class SoftFingerModules():
-    def __init__(self, ids=[40, 41, 42, 43, 44, 45, 50], motor_type="X",
+    def __init__(self, motor_type="X",
                  device="/dev/ttyUSB1", baudrate=57600, protocol=2):
-        self.servos = dxl(motor_id=ids, motor_type=motor_type,
+        
+        self.finger1_id = [40, 41]
+        self.finger2_id = [42, 43]
+        self.finger3_id = [44, 45]
+        self.object_id = [50]
+        self.servos = dxl(motor_id=[
+            *self.finger1_id, *self.finger2_id, *self.finger3_id, *self.object_id],
+             motor_type=motor_type,
                           devicename=device, baudrate=baudrate, protocol=protocol)
         self.servos.open_port()
         self.mid = np.pi
         range = 2.75
         self.min = {"left": self.mid - range/2, "right": self.mid + range/2}
         self.max = {"left": self.mid + range/4, "right": self.mid - range/4}
-
+        self.default = ((self.min["left"], self.min["right"]),)
         self.reset()
 
     def reset(self):
-        default = ((self.min["left"], self.min["right"]),) * 3
-        self.all_move(default)
-        self.servos.set_des_pos([self.servos.motor_id[-1]], [self.mid])
+        self.all_move(self.default * 3)
+        self.move_object(self.mid)
         err_thresh = 0.05
         errs = np.array([np.inf] * 1)
         while np.any(errs > err_thresh):
             curr = self.get_pos()
             errs = np.abs(curr[-1] - np.pi)
-        self.servos.engage_motor([50], False)
+        self.servos.engage_motor(self.object_id, False)
+
+    def move_object(self, pos):
+        self.servos.set_des_pos([self.servos.motor_id[-1]], [pos])
 
     def finger_delta(self, finger_num, dir):
         movements = {"up": np.array([0.1, -0.1]),
@@ -43,12 +52,6 @@ class SoftFingerModules():
         delta = movements[dir]
         new_pos = pos + delta
         self.finger_move(finger_num, new_pos)
-
-    def finger_stop(self, finger_num):
-        curr = self.get_pos()
-        left = (finger_num)*2
-        right = (finger_num)*2+1
-        self.finger_move(finger_num, curr[left:right+1])
 
     def finger_move(self, finger_num, pos, err_thresh=0.1):
         assert finger_num in [0, 1, 2]
@@ -72,6 +75,16 @@ def get_listener_funcs(queue):
     def on_press(key):
 
         command = lambda: None
+        try:
+            if key.char == "1":
+                command = lambda: manipulator.finger_move(0, manipulator.default[0])
+            if key.char == "2":
+                command = lambda: manipulator.finger_move(1, manipulator.default[0])
+            if key.char == "3":
+                command = lambda: manipulator.finger_move(2, manipulator.default[0])
+        except AttributeError:
+            pass
+
         try:
             if key.char == 'w':
                 command = lambda: manipulator.finger_delta(0, 'up')
@@ -133,5 +146,6 @@ if __name__ == "__main__":
     for i in range(int(1e6)):
         command = queue.get()
         command()
-    listener.join()
+        print(f"\n {manipulator.get_pos()}")
     manipulator.reset()
+    listener.join()
