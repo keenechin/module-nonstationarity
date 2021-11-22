@@ -7,8 +7,8 @@ from pynput import keyboard
 
 class SoftFingerModules():
     def __init__(self, motor_type="X",
-                 device="/dev/ttyUSB1", baudrate=57600, protocol=2):
-        
+                 device="/dev/ttyUSB0", baudrate=57600, protocol=2):
+
         self.finger1_id = [40, 41]
         self.finger2_id = [42, 43]
         self.finger3_id = [44, 45]
@@ -23,6 +23,8 @@ class SoftFingerModules():
         self.min = {"left": self.mid - range/2, "right": self.mid + range/2}
         self.max = {"left": self.mid + range/4, "right": self.mid - range/4}
         self.default = ((self.min["left"], self.min["right"]),)
+        self.theta_joints_nominal = np.array(self.default[0] * 3)
+        print(self.theta_joints_nominal)
         self.reset()
 
     def reset(self):
@@ -143,9 +145,14 @@ def start_user_input():
 if __name__ == "__main__":
     manipulator = SoftFingerModules()
     listener,queue = start_user_input()
-    for i in range(int(1e6)):
-        command = queue.get()
-        command()
+    while True:
+        try:
+            command = queue.get(False)
+            command()
+        except:
+            pass
         print(f"\n {manipulator.get_pos()}")
+        if listener.running is False:
+            break
+    print("Done")
     manipulator.reset()
-    listener.join()
