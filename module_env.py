@@ -1,4 +1,4 @@
-from soft_fingers import SoftFingerModules
+from soft_fingers import SoftFingerModules, start_user_input
 import gym
 from gym import spaces
 from gym.utils import seeding
@@ -35,15 +35,24 @@ class SoftFingerModulesEnv(gym.Env):
             dtype=np.float64
         )
 
+        self.action_space = spaces.Box(
+            low=np.array([*[self.hardware.min['left'], self.hardware.min['right'] * 3]]),
+            high=np.array([*[self.hardware.max['left'], self.hardware.max['right'] * 3]]),
+            dtype=np.float64
+        )
+
+        self.last_action = self.hardware.theta_joints_nominal
+        self.nominal_theta = 0.5
+
 
     def _get_obs(self):
         all_theta = self.hardware.get_pos()
         theta_joints = all_theta[0:6]
         theta_t_obj = all_theta[6]
         theta_t_obj_sincos = [np.sin(theta_t_obj), np.cos(theta_t_obj)]
-        theta_dot_joints = None
-        last_action = None
-        dtheta_obj = None
+        theta_dot_joints = np.array([0]*6) # TODO: Fix this
+        last_action = self.last_action
+        dtheta_obj = theta_t_obj - self.nominal_theta
 
         state = np.array([*theta_joints, 
                            *theta_dot_joints,
@@ -53,8 +62,12 @@ class SoftFingerModulesEnv(gym.Env):
         return state 
 
     
-    def step(self, u):
-        pass
+    def step(self, action):
+        self.hardware.all_move(action)
+        self.last_action = action
+        state = self._get_obs()
+        reward = self.reward(state)
+        return state, reward, False, {}
 
     def decompose(self, state):
         theta_joints = state[0:6]
@@ -74,7 +87,7 @@ class SoftFingerModulesEnv(gym.Env):
         #rt=−5|∆θt,obj|−‖θnominal−θt‖−∥∥∥ ̇θt∥∥∥+ 101(|∆θt,obj|<0.25) + 501(|∆θt,obj|<0.1
         theta_joints, theta_dot_joints, _, _, dtheta_obj = self.decompose(state)
         return -5 * np.abs(dtheta_obj) \
-                -np.linalg.norm(self.hardware.default - theta_joints) \
+                -np.linalg.norm(self.hardware.theta_joints_nominal - theta_joints) \
                 -np.linalg.norm(theta_dot_joints) \
                 + 10 * self.one_if(np.abs(dtheta_obj), thresh=0.25) \
                 + 50 * self.one_if(np.abs(dtheta_obj), thresh=0.10)
@@ -94,3 +107,7 @@ if __name__ == "__main__":
     env_name = 'SoftFingerModulesEnv-v0'
 
     env = gym.make(env_name)
+    listener, queue = start_user_input(env.hardware)
+    env.reset()
+
+

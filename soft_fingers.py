@@ -22,8 +22,8 @@ class SoftFingerModules():
         range = 2.75
         self.min = {"left": self.mid - range/2, "right": self.mid + range/2}
         self.max = {"left": self.mid + range/4, "right": self.mid - range/4}
-        self.default = ((self.min["left"], self.min["right"]),)
-        self.theta_joints_nominal = np.array(self.default[0] * 3)
+        self.finger_default = (self.min["left"], self.min["right"])
+        self.theta_joints_nominal = np.array(self.finger_default * 3)
 
         self.func_names = {'move': self.finger_move,
                            'delta': self.finger_delta,
@@ -36,7 +36,7 @@ class SoftFingerModules():
         self.reset()
 
     def reset(self):
-        self.all_move(self.default * 3)
+        self.all_move(self.theta_joints_nominal)
         self.move_object(self.mid)
         err_thresh = 0.05
         errs = np.array([np.inf] * 1)
@@ -97,7 +97,7 @@ class SoftFingerModules():
 
     def all_move(self, pos, err_thresh=0.1):
         for i in range(3):
-            self.finger_move(i, pos[i])
+            self.finger_move(i, pos[2*i:2*i+2])
 
 
     def get_pos(self):
@@ -117,13 +117,13 @@ def get_listener_funcs(queue):
         try:
             if key.char == "1":
                 command = {'func': 'move', 'params': (
-                    0, manipulator.default[0])}
+                    0, manipulator.finger_default)}
             elif key.char == "2":
                 command = {'func': 'move', 'params': (
-                    1, manipulator.default[0])}
+                    1, manipulator.finger_default)}
             elif key.char == "3":
                 command = {'func': 'move', 'params': (
-                    2, manipulator.default[0])}
+                    2, manipulator.finger_default)}
         except AttributeError:
             pass
 
@@ -174,30 +174,31 @@ def get_listener_funcs(queue):
     return on_press, on_release
 
 
-def start_user_input():
+def start_user_input(manipulator):
     queue = Queue()
     on_press, on_release = get_listener_funcs(queue)
     listener = keyboard.Listener(on_press=on_press, on_release=on_release)
     listener.start()
-    print("Starting keyboard listener")
-    return listener, queue
-
-
-if __name__ == "__main__":
-    manipulator = SoftFingerModules()
-    listener, queue = start_user_input()
+    print("Starting keyboard listener.")
     while True:
         try:
             command = queue.get(False)
             print(f": {manipulator.execute(command)}")
         except:
             pass
-        # print(f"\n {manipulator.get_pos()}")
+        print(f"\n {manipulator.get_pos()}")
         try:
             print(manipulator.monitor_queue.get(False))
         except:
             pass
         if listener.running is False:
             break
+
     print("Done")
+    return listener, queue
+
+
+if __name__ == "__main__":
+    manipulator = SoftFingerModules()
+    listener, queue = start_user_input(manipulator)
     manipulator.reset()
