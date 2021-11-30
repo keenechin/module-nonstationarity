@@ -2,7 +2,7 @@ from dynamixel_driver import dxl
 import numpy as np
 import time
 from multiprocessing import Process, Queue
-from pynput import keyboard
+import pygame
 
 
 class SoftFingerModules():
@@ -115,70 +115,92 @@ def get_listener_funcs(queue, manipulator):
     def on_press(key):
         command = {'func': 'idle', 'params': None}
         try:
-            if key.char == "1":
+            if key == pygame.K_1:
                 command = {'func': 'move', 'params': (
                     0, manipulator.finger_default)}
-            elif key.char == "2":
+            elif key == pygame.K_2:
                 command = {'func': 'move', 'params': (
                     1, manipulator.finger_default)}
-            elif key.char == "3":
+            elif key == pygame.K_3:
                 command = {'func': 'move', 'params': (
                     2, manipulator.finger_default)}
         except AttributeError:
             pass
 
         try:
-            if key.char == 'w':
+            if key == pygame.K_w:
                 command = {'func': 'delta', 'params': (0, 'up')}
-            elif key.char == 's':
+            elif key == pygame.K_s:
                 command = {'func': 'delta', 'params': (0, 'down')}
-            elif key.char == 'a':
+            elif key == pygame.K_a:
                 command = {'func': 'delta', 'params': (0, 'left')}
-            elif key.char == 'd':
+            elif key == pygame.K_d:
                 command = {'func': 'delta', 'params': (0, 'right')}
         except AttributeError:
             pass
 
         try:
-            if key.char == 'i':
+            if key == pygame.K_i:
                 command = {'func': 'delta', 'params': (1, 'up')}
-            elif key.char == 'k':
+            elif key == pygame.K_k:
                 command = {'func': 'delta', 'params': (1, 'down')}
-            elif key.char == 'j':
+            elif key == pygame.K_j:
                 command = {'func': 'delta', 'params': (1, 'left')}
-            elif key.char == 'l':
+            elif key == pygame.K_l:
                 command = {'func': 'delta', 'params': (1, 'right')}
         except AttributeError:
             pass
 
-        if key == keyboard.Key.up:
+        if key == pygame.K_UP:
             command = {'func': 'delta', 'params': (2, 'up')}
-        elif key == keyboard.Key.down:
+        elif key == pygame.K_DOWN:
             command = {'func': 'delta', 'params': (2, 'down')}
-        elif key == keyboard.Key.left:
+        elif key == pygame.K_LEFT:
             command = {'func': 'delta', 'params': (2, 'left')}
-        elif key == keyboard.Key.right:
+        elif key == pygame.K_RIGHT:
             command = {'func': 'delta', 'params': (2, 'right')}
 
         while not queue.empty():
             queue.get()
         queue.put(command)
 
+        return True
+
     def on_release(key):
         try:
-            if key == keyboard.Key.esc or key.char == 'q':
+            if key == pygame.K_ESCAPE or key == pygame.K_q:
                 return False
+            else:
+                return True
         except AttributeError:
             pass
 
+
     return on_press, on_release
+
+
+def listen_keys(on_press, on_release):
+    pygame.init()
+    pygame.display.set_mode((640, 480))
+    clock = pygame.time.Clock()
+    run = True
+    while run:
+        clock.tick(60)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+            elif event.type == pygame.KEYDOWN:
+                run = on_press(event.key)
+            elif event.type == pygame.KEYUP:
+                run = on_release(event.key)
+
 
 
 def collect_human_trajectory(manipulator):
     trajectory = []
     queue = Queue()
     on_press, on_release = get_listener_funcs(queue, manipulator)
-    listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+    listener = Process(target=listen_keys, args=(on_press, on_release))
     listener.start()
     print("Starting keyboard listener.")
     while True:
@@ -192,7 +214,8 @@ def collect_human_trajectory(manipulator):
             print(manipulator.monitor_queue.get(False))
         except:
             pass
-        if listener.running is False:
+
+        if not listener.is_alive():
             break
 
     print("Done")
