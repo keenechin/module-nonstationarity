@@ -1,4 +1,4 @@
-from soft_fingers import SoftFingerModules, start_user_input
+from soft_fingers import SoftFingerModules, collect_human_trajectory
 import gym
 from gym import spaces
 from gym.utils import seeding
@@ -50,7 +50,7 @@ class SoftFingerModulesEnv(gym.Env):
         theta_joints = all_theta[0:6]
         theta_t_obj = all_theta[6]
         theta_t_obj_sincos = [np.sin(theta_t_obj), np.cos(theta_t_obj)]
-        theta_dot_joints = np.array([0]*6) # TODO: Fix this
+        theta_dot_joints = theta_joints - self.last_action # TODO: Add instantaneous velocity
         last_action = self.last_action
         dtheta_obj = theta_t_obj - self.nominal_theta
 
@@ -80,6 +80,7 @@ class SoftFingerModulesEnv(gym.Env):
 
 
     def one_if(self, x, thresh):
+        # return 1 if x < thresh, 0 if not 
         return (0,1)[x<thresh]
 
 
@@ -107,7 +108,7 @@ if __name__ == "__main__":
     env_name = 'SoftFingerModulesEnv-v0'
 
     env = gym.make(env_name)
-    listener, queue = start_user_input(env.hardware)
+    listener, queue = collect_human_trajectory(env.hardware)
     env.reset()
 
 

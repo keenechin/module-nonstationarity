@@ -30,7 +30,7 @@ class SoftFingerModules():
                            'idle': lambda: print('idle')}
 
         self.monitor_queue = Queue()
-        self.monitoring_process = Process(target=self.monitor_state, args=(self.monitor_queue,))
+        # self.monitoring_process = Process(target=self.monitor_state, args=(self.monitor_queue,))
         # self.monitoring_process.start()
         time.sleep(1)
         self.reset()
@@ -93,7 +93,7 @@ class SoftFingerModules():
             # curr = self.monitor_queue.get()[0]
             curr = self.get_pos()
             errs = np.abs(curr[left:right+1] - pos)
-        return curr[-1]
+        return curr
 
     def all_move(self, pos, err_thresh=0.1):
         for i in range(3):
@@ -111,7 +111,7 @@ class SoftFingerModules():
         return func(*params)
 
 
-def get_listener_funcs(queue):
+def get_listener_funcs(queue, manipulator):
     def on_press(key):
         command = {'func': 'idle', 'params': None}
         try:
@@ -174,9 +174,10 @@ def get_listener_funcs(queue):
     return on_press, on_release
 
 
-def start_user_input(manipulator):
+def collect_human_trajectory(manipulator):
+    trajectory = []
     queue = Queue()
-    on_press, on_release = get_listener_funcs(queue)
+    on_press, on_release = get_listener_funcs(queue, manipulator)
     listener = keyboard.Listener(on_press=on_press, on_release=on_release)
     listener.start()
     print("Starting keyboard listener.")
@@ -186,7 +187,7 @@ def start_user_input(manipulator):
             print(f": {manipulator.execute(command)}")
         except:
             pass
-        print(f"\n {manipulator.get_pos()}")
+        # print(f"\n {manipulator.get_pos()}")
         try:
             print(manipulator.monitor_queue.get(False))
         except:
@@ -200,5 +201,5 @@ def start_user_input(manipulator):
 
 if __name__ == "__main__":
     manipulator = SoftFingerModules()
-    listener, queue = start_user_input(manipulator)
+    listener, queue = collect_human_trajectory(manipulator)
     manipulator.reset()
