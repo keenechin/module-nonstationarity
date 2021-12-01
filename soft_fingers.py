@@ -38,12 +38,12 @@ class SoftFingerModules():
     def reset(self):
         self.all_move(self.theta_joints_nominal)
         self.move_object(self.mid)
+        self.servos.engage_motor(self.object_id, False)
         err_thresh = 0.05
         errs = np.array([np.inf] * 1)
         while np.any(errs > err_thresh):
             curr = self.get_pos()
             errs = np.abs(curr[-1] - np.pi)
-        self.servos.engage_motor(self.object_id, False)
 
     def monitor_state(self, queue):
         print("Begin monitoring.")

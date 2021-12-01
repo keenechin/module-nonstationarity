@@ -8,8 +8,7 @@ import torch.optim as optim
 import time
 import pickle
 import pdb
-
-from soft_fingers import get_listener_funcs
+from soft_fingers import collect_human_trajectory
 
 class ActionNetwork(nn.Module):
     def __init__(self, env):
@@ -67,7 +66,8 @@ def learn_model(env, policy, params, N):
     return model, X, y
 
 
-def expert_demonstration_policy(state, params):
+def generate_expert_demonstration_policy(state, params):
+
     pass
 
 
@@ -178,13 +178,14 @@ if __name__ == "__main__":
 
     env = gym.make(env_name)
     random_policy = get_env_random_policy(env)
+    demo_policy = generate_expert_demonstration_policy(env)
     np.random.seed(6)
     for i in range(1):
         N = 1000 * 5**(int(i/2))
         start = time.time()
         print(f"Collecting {N} samples.")
         policy_file, w, model = get_model_contingent(
-            learn_model, random_policy, env_name, env, N)
+            learn_model, demo_policy, env_name, env, N)
         print(f"Time passed to collect {N} samples: {(time.time()-start)/60.0} minutes")
 
         # Learning Code Here
@@ -195,8 +196,8 @@ if __name__ == "__main__":
         LEARNING_RATE = 0.0001
         LR_FINAL = 0.2
         GAMMA = 0.99
-        episode_rewards, best_w, best_score = reinforce(
-            random_policy, w, softmax_grad, env, model, NUM_EPISODES, LEARNING_RATE, LR_FINAL, GAMMA)
+        episode_rewards, best_score, best_params = reinforce(
+            ActionNetwork(env), env, model, NUM_EPISODES, LEARNING_RATE, LR_FINAL, GAMMA)
 
         # print((best_score, best_w))
         pickle.dump(best_w, open(policy_file, 'wb'))
