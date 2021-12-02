@@ -1,4 +1,4 @@
-from soft_fingers import SoftFingerModules, collect_human_trajectory
+from soft_fingers import SoftFingerModules, ExpertActionStream
 import gym
 from gym import spaces
 from gym.utils import seeding
@@ -106,9 +106,9 @@ if __name__ == "__main__":
     )
     # env_name = 'CartPole-v1'
     env_name = 'SoftFingerModulesEnv-v0'
-
     env = gym.make(env_name)
-    listener, queue = collect_human_trajectory(env.hardware)
+
+    listener, queue = get_expert_action_stream(env.hardware)
     env.reset()
 
 

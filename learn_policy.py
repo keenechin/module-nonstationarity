@@ -8,7 +8,7 @@ import torch.optim as optim
 import time
 import pickle
 import pdb
-from soft_fingers import collect_human_trajectory
+from soft_fingers import get_expert_action_stream
 
 class ActionNetwork(nn.Module):
     def __init__(self, env):

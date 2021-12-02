@@ -1,3 +1,4 @@
+from queue import Empty
 from dynamixel_driver import dxl
 import numpy as np
 import time
@@ -7,7 +8,7 @@ import pygame
 
 class SoftFingerModules():
     def __init__(self, motor_type="X",
-                 device="/dev/ttyUSB1", baudrate=57600, protocol=2):
+                 device="/dev/ttyUSB0", baudrate=57600, protocol=2):
 
         self.finger1_id = [40, 41]
         self.finger2_id = [42, 43]
@@ -38,12 +39,12 @@ class SoftFingerModules():
     def reset(self):
         self.all_move(self.theta_joints_nominal)
         self.move_object(self.mid)
-        self.servos.engage_motor(self.object_id, False)
         err_thresh = 0.05
         errs = np.array([np.inf] * 1)
         while np.any(errs > err_thresh):
             curr = self.get_pos()
             errs = np.abs(curr[-1] - np.pi)
+        self.servos.engage_motor(self.object_id, False)
 
     def monitor_state(self, queue):
         print("Begin monitoring.")
@@ -111,118 +112,123 @@ class SoftFingerModules():
         return func(*params)
 
 
-def get_listener_funcs(queue, manipulator):
-    def on_press(key):
-        command = {'func': 'idle', 'params': None}
-        try:
-            if key == pygame.K_1:
-                command = {'func': 'move', 'params': (
-                    0, manipulator.finger_default)}
-            elif key == pygame.K_2:
-                command = {'func': 'move', 'params': (
-                    1, manipulator.finger_default)}
-            elif key == pygame.K_3:
-                command = {'func': 'move', 'params': (
-                    2, manipulator.finger_default)}
-        except AttributeError:
-            pass
-
-        try:
-            if key == pygame.K_w:
-                command = {'func': 'delta', 'params': (0, 'up')}
-            elif key == pygame.K_s:
-                command = {'func': 'delta', 'params': (0, 'down')}
-            elif key == pygame.K_a:
-                command = {'func': 'delta', 'params': (0, 'left')}
-            elif key == pygame.K_d:
-                command = {'func': 'delta', 'params': (0, 'right')}
-        except AttributeError:
-            pass
-
-        try:
-            if key == pygame.K_i:
-                command = {'func': 'delta', 'params': (1, 'up')}
-            elif key == pygame.K_k:
-                command = {'func': 'delta', 'params': (1, 'down')}
-            elif key == pygame.K_j:
-                command = {'func': 'delta', 'params': (1, 'left')}
-            elif key == pygame.K_l:
-                command = {'func': 'delta', 'params': (1, 'right')}
-        except AttributeError:
-            pass
-
-        if key == pygame.K_UP:
-            command = {'func': 'delta', 'params': (2, 'up')}
-        elif key == pygame.K_DOWN:
-            command = {'func': 'delta', 'params': (2, 'down')}
-        elif key == pygame.K_LEFT:
-            command = {'func': 'delta', 'params': (2, 'left')}
-        elif key == pygame.K_RIGHT:
-            command = {'func': 'delta', 'params': (2, 'right')}
-
-        while not queue.empty():
-            queue.get()
-        queue.put(command)
-
-        return True
-
-    def on_release(key):
-        try:
-            if key == pygame.K_ESCAPE or key == pygame.K_q:
-                return False
-            else:
-                return True
-        except AttributeError:
-            pass
-
-
-    return on_press, on_release
-
-
-def listen_keys(on_press, on_release):
-    pygame.init()
-    pygame.display.set_mode((640, 480))
-    clock = pygame.time.Clock()
-    run = True
-    while run:
-        clock.tick(60)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                run = False
-            elif event.type == pygame.KEYDOWN:
-                run = on_press(event.key)
-            elif event.type == pygame.KEYUP:
-                run = on_release(event.key)
 
 
 
-def collect_human_trajectory(manipulator):
-    trajectory = []
-    queue = Queue()
-    on_press, on_release = get_listener_funcs(queue, manipulator)
-    listener = Process(target=listen_keys, args=(on_press, on_release))
-    listener.start()
-    print("Starting keyboard listener.")
-    while True:
-        try:
-            command = queue.get(False)
-            print(f": {manipulator.execute(command)}")
-        except:
-            pass
-        # print(f"\n {manipulator.get_pos()}")
-        try:
-            print(manipulator.monitor_queue.get(False))
-        except:
-            pass
+class ExpertActionStream():
+    def __init__(self, manipulator):
+        self.manipulator = manipulator
 
-        if not listener.is_alive():
-            break
 
-    print("Done")
-    return listener, queue
+    def get_listener_funcs(queue, manipulator):
+        def on_press(key):
+            command = {'func': 'idle', 'params': None}
+            try:
+                if key == pygame.K_1:
+                    command = {'func': 'move', 'params': (
+                        0, manipulator.finger_default)}
+                elif key == pygame.K_2:
+                    command = {'func': 'move', 'params': (
+                        1, manipulator.finger_default)}
+                elif key == pygame.K_3:
+                    command = {'func': 'move', 'params': (
+                        2, manipulator.finger_default)}
+            except AttributeError:
+                pass
+
+            try:
+                if key == pygame.K_w:
+                    command = {'func': 'delta', 'params': (0, 'up')}
+                elif key == pygame.K_s:
+                    command = {'func': 'delta', 'params': (0, 'down')}
+                elif key == pygame.K_a:
+                    command = {'func': 'delta', 'params': (0, 'left')}
+                elif key == pygame.K_d:
+                    command = {'func': 'delta', 'params': (0, 'right')}
+            except AttributeError:
+                pass
+
+            try:
+                if key == pygame.K_i:
+                    command = {'func': 'delta', 'params': (1, 'up')}
+                elif key == pygame.K_k:
+                    command = {'func': 'delta', 'params': (1, 'down')}
+                elif key == pygame.K_j:
+                    command = {'func': 'delta', 'params': (1, 'left')}
+                elif key == pygame.K_l:
+                    command = {'func': 'delta', 'params': (1, 'right')}
+            except AttributeError:
+                pass
+
+            if key == pygame.K_UP:
+                command = {'func': 'delta', 'params': (2, 'up')}
+            elif key == pygame.K_DOWN:
+                command = {'func': 'delta', 'params': (2, 'down')}
+            elif key == pygame.K_LEFT:
+                command = {'func': 'delta', 'params': (2, 'left')}
+            elif key == pygame.K_RIGHT:
+                command = {'func': 'delta', 'params': (2, 'right')}
+
+            while not queue.empty():
+                queue.get()
+            queue.put(command)
+
+            return True
+
+        def on_release(key):
+            try:
+                if key == pygame.K_ESCAPE or key == pygame.K_q:
+                    return False
+                else:
+                    return True
+            except AttributeError:
+                pass
+
+
+        return on_press, on_release
+
+
+    def listen_keys(on_press, on_release):
+        pygame.init()
+        pygame.display.set_mode((640, 480))
+        clock = pygame.time.Clock()
+        run = True
+        while run:
+            clock.tick(60)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    run = False
+                elif event.type == pygame.KEYDOWN:
+                    run = on_press(event.key)
+                elif event.type == pygame.KEYUP:
+                    run = on_release(event.key)
+
+
+
+    def __enter__(self):
+        self.communication_queue = Queue()
+        on_press, on_release = ExpertActionStream.get_listener_funcs(self.communication_queue, self.manipulator)
+        self.listener_process = Process(target=ExpertActionStream.listen_keys, args=(on_press, on_release))
+        self.listener_process.start()
+        return self.listener_process, self.communication_queue
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self.listener_process.terminate()
+
 
 
 if __name__ == "__main__":
     manipulator = SoftFingerModules()
-    listener, queue = collect_human_trajectory(manipulator)
+    with ExpertActionStream(manipulator) as action_listener:
+        process = action_listener[0]
+        queue = action_listener[1]
+        while process.is_alive():
+            try:
+                command = queue.get_nowait()
+                manipulator.execute(command)
+            except Empty:
+                pass
+
+        
+
     manipulator.reset()
