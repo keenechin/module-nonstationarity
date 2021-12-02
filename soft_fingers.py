@@ -28,13 +28,14 @@ class SoftFingerModules():
 
         self.func_names = {'move': self.finger_move,
                            'delta': self.finger_delta,
-                           'idle': lambda: print('idle')}
+                           'idle': lambda: self.get_pos()[-1]}
 
-        time.sleep(1)
+        time.sleep(0.1)
         self.reset()
 
     def reset(self):
         self.all_move(self.theta_joints_nominal)
+        self.servos.engage_motor(self.object_id, True)
         self.move_object(self.mid)
         err_thresh = 0.05
         errs = np.array([np.inf] * 1)
@@ -42,8 +43,6 @@ class SoftFingerModules():
             curr = self.get_pos()
             errs = np.abs(curr[-1] - np.pi)
         self.servos.engage_motor(self.object_id, False)
-
-
 
     def move_object(self, pos):
         self.servos.set_des_pos([self.servos.motor_id[-1]], [pos])
@@ -55,38 +54,40 @@ class SoftFingerModules():
                      "right": np.array([-0.1, -0.1])}
         assert dir in movements.keys()
         assert finger_num in [0, 1, 2]
-        curr = self.get_pos()
-        left = (finger_num)*2
-        right = (finger_num)*2+1
-        pos = np.array(curr[left:right+1])
         delta = movements[dir]
-        new_pos = pos + delta
-        return self.finger_move(finger_num, new_pos)
+        pos = self.get_pos()[:-1]
+        left = (finger_num)*2
+        right = (finger_num)*2+2
+        pos[left: right] = pos[left: right] + delta
+        return pos
 
-    def finger_move(self, finger_num, pos, err_thresh=0.1):
+    def finger_move(self, finger_num, finger_pos):
         assert finger_num in [0, 1, 2]
         left = (finger_num)*2
-        right = (finger_num)*2+1
-        self.servos.set_des_pos(self.servos.motor_id[left:right+1], pos)
-        errs = np.array([np.inf, np.inf])
-        while np.any(errs > err_thresh):
-            curr = self.get_pos()
-            errs = np.abs(curr[left:right+1] - pos)
-        return curr
+        right = (finger_num)*2+2
+        pos = self.get_pos()[:-1]
+        pos[left:right] = finger_pos
+        return pos
 
     def all_move(self, pos, err_thresh=0.1):
         self.servos.set_des_pos(self.servos.motor_id[:-1], pos)
+        errs = np.array([np.inf] * 6)
+        while np.any(errs > err_thresh):
+            curr = self.get_pos()[:-1]
+            errs = np.abs(curr - pos)
+
 
 
     def get_pos(self):
         return self.servos.get_pos(self.servos.motor_id)
 
-    def execute(self, command):
+    def parse(self, command):
         func_name = command['func']
         assert func_name in self.func_names
         func = self.func_names[func_name]
         params = command['params']
-        return func(*params)
+        action = func(*params)
+        return action
 
 
 
@@ -177,22 +178,22 @@ class ExpertActionStream():
         pygame.display.set_icon(pygame.image.load('soft_finger_icon.png'))
         fontsize = 32
         font = pygame.font.Font('freesansbold.ttf', fontsize)
+        text1 = font.render("Finger 1: Move with w, a, s, d , Retract with 1", True, green, blue)
+        text2 = font.render("Finger 2: Move with i, j, k, l , Retract with 2", True, green, blue)
+        text3 = font.render("Finger 3: Move with up, down, left, right,  Retract with 3", True, green, blue)
+        text4 = font.render("Quit with Esc, or q", True, (255, 0, 0), (0,0,0))
+        textRect1 = text1.get_rect()
+        textRect1.center = (width//2, height//2 - fontsize)
+        textRect2 = text2.get_rect()
+        textRect2.center = (width//2, height//2)
+        textRect3 = text3.get_rect()
+        textRect3.center = (width//2, height//2 + fontsize)
+        textRect4 = text3.get_rect()
+        textRect4.center = (width//2, fontsize//2)
         clock = pygame.time.Clock()
         run = True
         while run:
-            clock.tick(60)
-            text1 = font.render("Finger 1: Move with w, a, s, d , Retract with 1", True, green, blue)
-            text2 = font.render("Finger 2: Move with i, j, k, l , Retract with 2", True, green, blue)
-            text3 = font.render("Finger 3: Move with up, down, left, right,  Retract with 3", True, green, blue)
-            text4 = font.render("Quit with Esc, or q", True, (255, 0, 0), (0,0,0))
-            textRect1 = text1.get_rect()
-            textRect1.center = (width//2, height//2 - fontsize)
-            textRect2 = text2.get_rect()
-            textRect2.center = (width//2, height//2)
-            textRect3 = text3.get_rect()
-            textRect3.center = (width//2, height//2 + fontsize)
-            textRect4 = text3.get_rect()
-            textRect4.center = (width//2, fontsize//2)
+            clock.tick(5)
             window.fill(white)
             window.blit(text1, textRect1)
             window.blit(text2, textRect2)
@@ -232,7 +233,8 @@ if __name__ == "__main__":
             try:
                 command = queue.get_nowait()
                 try:
-                    manipulator.execute(command)
+                    pos = manipulator.parse(command)
+                    manipulator.all_move(pos)
                 except TypeError:
                     pass
             except Empty:
