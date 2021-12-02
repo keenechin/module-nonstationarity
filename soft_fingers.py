@@ -30,9 +30,6 @@ class SoftFingerModules():
                            'delta': self.finger_delta,
                            'idle': lambda: print('idle')}
 
-        self.monitor_queue = Queue()
-        # self.monitoring_process = Process(target=self.monitor_state, args=(self.monitor_queue,))
-        # self.monitoring_process.start()
         time.sleep(1)
         self.reset()
 
@@ -46,23 +43,6 @@ class SoftFingerModules():
             errs = np.abs(curr[-1] - np.pi)
         self.servos.engage_motor(self.object_id, False)
 
-    def monitor_state(self, queue):
-        print("Begin monitoring.")
-        pos = self.get_pos()[:-1]
-        while True:
-            while not queue.empty():
-                signal = queue.get()
-                if signal == 0:
-                    break
-            last_pos = pos
-            try:
-                pos = self.get_pos()[:-1]
-                vel = pos - last_pos
-                state = [pos, vel]
-                # print(state)
-                queue.put(state)
-            except:
-                continue
 
 
     def move_object(self, pos):
@@ -75,7 +55,6 @@ class SoftFingerModules():
                      "right": np.array([-0.1, -0.1])}
         assert dir in movements.keys()
         assert finger_num in [0, 1, 2]
-        # curr = self.monitor_queue.get()[0]
         curr = self.get_pos()
         left = (finger_num)*2
         right = (finger_num)*2+1
@@ -91,14 +70,12 @@ class SoftFingerModules():
         self.servos.set_des_pos(self.servos.motor_id[left:right+1], pos)
         errs = np.array([np.inf, np.inf])
         while np.any(errs > err_thresh):
-            # curr = self.monitor_queue.get()[0]
             curr = self.get_pos()
             errs = np.abs(curr[left:right+1] - pos)
         return curr
 
     def all_move(self, pos, err_thresh=0.1):
-        for i in range(3):
-            self.finger_move(i, pos[2*i:2*i+2])
+        self.servos.set_des_pos(self.servos.motor_id[:-1], pos)
 
 
     def get_pos(self):
@@ -190,11 +167,38 @@ class ExpertActionStream():
 
     def listen_keys(on_press, on_release):
         pygame.init()
-        pygame.display.set_mode((640, 480))
+        width = 1080
+        height = 720
+        white = (255, 255, 255)
+        green = (10, 70, 0)
+        blue = (200, 200, 255)
+        window = pygame.display.set_mode((width, height))
+        pygame.display.set_caption('Soft Finger Keyboard Controller')
+        pygame.display.set_icon(pygame.image.load('soft_finger_icon.png'))
+        fontsize = 32
+        font = pygame.font.Font('freesansbold.ttf', fontsize)
         clock = pygame.time.Clock()
         run = True
         while run:
             clock.tick(60)
+            text1 = font.render("Finger 1: Move with w, a, s, d , Retract with 1", True, green, blue)
+            text2 = font.render("Finger 2: Move with i, j, k, l , Retract with 2", True, green, blue)
+            text3 = font.render("Finger 3: Move with up, down, left, right,  Retract with 3", True, green, blue)
+            text4 = font.render("Quit with Esc, or q", True, (255, 0, 0), (0,0,0))
+            textRect1 = text1.get_rect()
+            textRect1.center = (width//2, height//2 - fontsize)
+            textRect2 = text2.get_rect()
+            textRect2.center = (width//2, height//2)
+            textRect3 = text3.get_rect()
+            textRect3.center = (width//2, height//2 + fontsize)
+            textRect4 = text3.get_rect()
+            textRect4.center = (width//2, fontsize//2)
+            window.fill(white)
+            window.blit(text1, textRect1)
+            window.blit(text2, textRect2)
+            window.blit(text3, textRect3)
+            window.blit(text4, textRect4)
+            pygame.display.update()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     run = False
@@ -210,9 +214,11 @@ class ExpertActionStream():
         on_press, on_release = ExpertActionStream.get_listener_funcs(self.communication_queue, self.manipulator)
         self.listener_process = Process(target=ExpertActionStream.listen_keys, args=(on_press, on_release))
         self.listener_process.start()
+        print("Starting keyboard listener.")
         return self.listener_process, self.communication_queue
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
+        print("Closing keyboard listener.")
         self.listener_process.terminate()
 
 
@@ -225,10 +231,11 @@ if __name__ == "__main__":
         while process.is_alive():
             try:
                 command = queue.get_nowait()
-                manipulator.execute(command)
+                try:
+                    manipulator.execute(command)
+                except TypeError:
+                    pass
             except Empty:
                 pass
-
-        
 
     manipulator.reset()

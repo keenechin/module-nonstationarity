@@ -108,7 +108,6 @@ if __name__ == "__main__":
     env_name = 'SoftFingerModulesEnv-v0'
     env = gym.make(env_name)
 
-    listener, queue = get_expert_action_stream(env.hardware)
     env.reset()
 
 
