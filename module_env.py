@@ -8,9 +8,11 @@ import numpy as np
 class SoftFingerModulesEnv(gym.Env):
     def __init__(self):
         self.hardware = SoftFingerModules()
+        low = [self.hardware.min['left'], self.hardware.min['right']] * 3
+        high = [self.hardware.max['left'], self.hardware.max['right']]* 3
         self.action_space = spaces.Box(
-            low=np.array([self.hardware.min['left'], self.hardware.min['right']] * 3),
-            high=np.array([self.hardware.max['left'], self.hardware.max['right']]* 3),
+            low=np.array(low),
+            high=np.array(high),
             dtype=np.float64
         )
 
@@ -35,13 +37,9 @@ class SoftFingerModulesEnv(gym.Env):
             dtype=np.float64
         )
 
-        self.action_space = spaces.Box(
-            low=np.array([*[self.hardware.min['left'], self.hardware.min['right'] * 3]]),
-            high=np.array([*[self.hardware.max['left'], self.hardware.max['right'] * 3]]),
-            dtype=np.float64
-        )
 
         self.last_action = self.hardware.theta_joints_nominal
+        self.last_pos = self.hardware.theta_joints_nominal
         self.nominal_theta = 0.5
 
 
@@ -50,7 +48,7 @@ class SoftFingerModulesEnv(gym.Env):
         theta_joints = all_theta[0:6]
         theta_t_obj = all_theta[6]
         theta_t_obj_sincos = [np.sin(theta_t_obj), np.cos(theta_t_obj)]
-        theta_dot_joints = theta_joints - self.last_action # TODO: Add instantaneous velocity
+        theta_dot_joints = theta_joints - self.last_pos # TODO: Add instantaneous velocity
         last_action = self.last_action
         dtheta_obj = theta_t_obj - self.nominal_theta
 
@@ -65,6 +63,7 @@ class SoftFingerModulesEnv(gym.Env):
     def step(self, action):
         self.hardware.all_move(action)
         self.last_action = action
+        self.last_pos = self.hardware.get_pos()[:-1]
         state = self._get_obs()
         reward = self.reward(state)
         return state, reward, False, {}
@@ -104,9 +103,15 @@ if __name__ == "__main__":
         entry_point='module_env:SoftFingerModulesEnv',
         kwargs={}
     )
-    # env_name = 'CartPole-v1'
+    import time
     env_name = 'SoftFingerModulesEnv-v0'
     env = gym.make(env_name)
+    for i in range(100):
+        action = env.action_space.sample()
+        env.step(action)
+        print(env.last_pos - action)
+        input("Press any key to continue.")
+
 
     env.reset()
 

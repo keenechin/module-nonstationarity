@@ -20,11 +20,12 @@ class SoftFingerModules():
             devicename=device, baudrate=baudrate, protocol=protocol)
         self.servos.open_port()
         self.mid = np.pi
-        range = 2.75
-        self.min = {"left": self.mid - range/2, "right": self.mid + range/2}
-        self.max = {"left": self.mid + range/4, "right": self.mid - range/4}
-        self.finger_default = (self.min["left"], self.min["right"])
+        range = 2
+        self.min = {"left": self.mid -  3 * range/4, "right": self.mid - range/4}
+        self.max = {"left": self.mid + range/4, "right": self.mid + 3 *range/4}
+        self.finger_default = (self.min["left"], self.max["right"])
         self.theta_joints_nominal = np.array(self.finger_default * 3)
+        # self.theta_joints_nominal = np.array([self.mid] * 6)
 
         self.func_names = {'move': self.finger_move,
                            'delta': self.finger_delta,
@@ -69,12 +70,26 @@ class SoftFingerModules():
         pos[left:right] = finger_pos
         return pos
 
-    def all_move(self, pos, err_thresh=0.1):
+    def all_move(self, pos, err_thresh=0.05, timeout=0.3):
+        for i in range(len(pos)): 
+            if i%2 == 0:
+                # print(pos[i])
+                pos[i] = np.clip(pos[i], self.min['left'], self.max['left'])
+                # print(pos[i])
+            else:
+                # print(pos[i])
+                pos[i] = np.clip(pos[i], self.min['right'], self.max['right'])
+                # print(pos[i])
         self.servos.set_des_pos(self.servos.motor_id[:-1], pos)
         errs = np.array([np.inf] * 6)
+        start = time.time()
         while np.any(errs > err_thresh):
             curr = self.get_pos()[:-1]
             errs = np.abs(curr - pos)
+            elapsed = time.time() - start
+            if elapsed > timeout:
+                break 
+            
 
 
 
@@ -231,7 +246,7 @@ if __name__ == "__main__":
         queue = action_listener[1]
         while process.is_alive():
             try:
-                command = queue.get_nowait()
+                command = queue.get(False)
                 try:
                     pos = manipulator.parse(command)
                     manipulator.all_move(pos)
