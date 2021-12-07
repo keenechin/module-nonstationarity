@@ -20,7 +20,7 @@ class SoftFingerModules():
             devicename=device, baudrate=baudrate, protocol=protocol)
         self.servos.open_port()
         self.mid = np.pi
-        range = 2
+        range = 2.1
         self.min = {"left": self.mid -  3 * range/4, "right": self.mid - range/4}
         self.max = {"left": self.mid + range/4, "right": self.mid + 3 *range/4}
         self.finger_default = (self.min["left"], self.max["right"])
@@ -30,7 +30,6 @@ class SoftFingerModules():
         self.func_names = {'move': self.finger_move,
                            'delta': self.finger_delta,
                            'idle': lambda: self.get_pos()[-1]}
-
         time.sleep(0.1)
         self.reset()
 
@@ -48,11 +47,11 @@ class SoftFingerModules():
     def move_object(self, pos):
         self.servos.set_des_pos([self.servos.motor_id[-1]], [pos])
 
-    def finger_delta(self, finger_num, dir):
-        movements = {"up": np.array([0.1, -0.1]),
-                     "down": np.array([-0.1, 0.1]),
-                     "left": np.array([0.1, 0.1]),
-                     "right": np.array([-0.1, -0.1])}
+    def finger_delta(self, finger_num, dir, mag=0.15):
+        movements = {"up": np.array([mag, -mag]),
+                     "down": np.array([-mag, mag]),
+                     "left": np.array([mag, mag]),
+                     "right": np.array([-mag, -mag])}
         assert dir in movements.keys()
         assert finger_num in [0, 1, 2]
         delta = movements[dir]
@@ -73,26 +72,21 @@ class SoftFingerModules():
     def all_move(self, pos, err_thresh=0.05, timeout=0.3):
         for i in range(len(pos)): 
             if i%2 == 0:
-                # print(pos[i])
                 pos[i] = np.clip(pos[i], self.min['left'], self.max['left'])
-                # print(pos[i])
             else:
-                # print(pos[i])
                 pos[i] = np.clip(pos[i], self.min['right'], self.max['right'])
-                # print(pos[i])
         self.servos.set_des_pos(self.servos.motor_id[:-1], pos)
         errs = np.array([np.inf] * 6)
         start = time.time()
         while np.any(errs > err_thresh):
-            curr = self.get_pos()[:-1]
+            all_curr = self.get_pos()
+            curr = all_curr[:-1]
             errs = np.abs(curr - pos)
             elapsed = time.time() - start
             if elapsed > timeout:
                 break 
+        self.object_pos = all_curr[-1]
             
-
-
-
     def get_pos(self):
         return self.servos.get_pos(self.servos.motor_id)
 
@@ -114,19 +108,19 @@ class ExpertActionStream():
         self.target_theta = target_theta
 
 
-    def get_listener_funcs(self, queue, manipulator):
+    def get_listener_funcs(self, queue):
         def on_press(key):
             command = {'func': 'idle', 'params': None}
             try:
                 if key == pygame.K_1:
                     command = {'func': 'move', 'params': (
-                        0, manipulator.finger_default)}
+                        0, self.manipulator.finger_default)}
                 elif key == pygame.K_2:
                     command = {'func': 'move', 'params': (
-                        1, manipulator.finger_default)}
+                        1, self.manipulator.finger_default)}
                 elif key == pygame.K_3:
                     command = {'func': 'move', 'params': (
-                        2, manipulator.finger_default)}
+                        2, self.manipulator.finger_default)}
             except AttributeError:
                 pass
 
@@ -208,17 +202,15 @@ class ExpertActionStream():
         quitRect = (0,0)
 
 
-
-
+        current_angle = self.manipulator.object_pos
         clock = pygame.time.Clock()
         run = True
         while run:
             clock.tick(5)
-
             try:
-                current_angle = self.manipulator.get_pos()[-1]
-            except:
-                print("AAAAA")
+                current_angle = self.state_channel.get_nowait()
+            except Empty:
+                pass
             target_angle = self.target_theta
             text_current = font.render(f"Current angle: {current_angle}", True, white, (0,0,0))
             text_target = font.render(f"Target angle: {target_angle}", True, white, (0,0,0))
@@ -245,12 +237,13 @@ class ExpertActionStream():
 
 
     def __enter__(self):
-        self.communication_queue = Queue()
-        on_press, on_release = self.get_listener_funcs(self.communication_queue, self.manipulator)
+        self.action_channel = Queue()
+        self.state_channel = Queue()
+        on_press, on_release = self.get_listener_funcs(self.action_channel)
         self.listener_process = Process(target=self.listen_keys, args=(on_press, on_release))
         self.listener_process.start()
         print("Starting keyboard listener.")
-        return self.listener_process, self.communication_queue
+        return self.listener_process, self.action_channel, self.state_channel
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         print("Closing keyboard listener.")
@@ -260,15 +253,18 @@ class ExpertActionStream():
 
 if __name__ == "__main__":
     manipulator = SoftFingerModules()
-    with ExpertActionStream(manipulator, np.pi/2) as action_listener:
-        process = action_listener[0]
-        queue = action_listener[1]
+    with ExpertActionStream(manipulator, 0) as action_listener:
+        process, action_channel, state_channel = action_listener
+        
         while process.is_alive():
             try:
-                command = queue.get(False)
+                command = action_channel.get(False)
                 try:
                     pos = manipulator.parse(command)
                     manipulator.all_move(pos)
+                    while not state_channel.empty():
+                        state_channel.get()
+                    state_channel.put(manipulator.object_pos)
                 except TypeError:
                     pass
             except Empty:

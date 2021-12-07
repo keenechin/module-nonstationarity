@@ -66,16 +66,21 @@ def create_random_policy(env):
     return random_policy
 
 
-def create_expert_policy(env, expert_listener):
+def create_expert_policy(env, expert_listener, state_channel):
     def expert_policy(state, params):
-        try:
-            command = expert_listener.get()
-            try: 
-                action = env.hardware.parse(command)
-            except TypeError:
+        while True:
+            try:
+                command = expert_listener.get()
+                try: 
+                    action = env.hardware.parse(command)
+                    break
+                except TypeError:
+                    pass
+            except Empty:
                 pass
-        except Empty:
-            pass
+        while not state_channel.empty():
+            state_channel.get()
+        state_channel.put(env.hardware.object_pos)
         return action
     return expert_policy
 
@@ -90,11 +95,12 @@ if __name__ == "__main__":
 
     env = gym.make(env_name)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f'Using {device} device')
+    print(f'Using {device} device for torch.')
     np.random.seed(6)
+    num_steps = 100
+    target_theta = 0
 
-    with ExpertActionStream(env.hardware) as action_listener:
-        process = action_listener[0]
-        queue = action_listener[1]
-        X,y,rewards = rollout(env, create_expert_policy(env, queue), None, 2)
+    with ExpertActionStream(env.hardware, target_theta) as action_listener:
+        process, action_channel, state_channel = action_listener
+        X,y,rewards = rollout(env, create_expert_policy(env, action_channel, state_channel), None, num_steps)
     print(f"X: {X}\ny: {y}\nRewards: {rewards} ")
