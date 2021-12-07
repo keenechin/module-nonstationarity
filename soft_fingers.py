@@ -109,11 +109,12 @@ class SoftFingerModules():
 
 
 class ExpertActionStream():
-    def __init__(self, manipulator):
+    def __init__(self, manipulator, target_theta):
         self.manipulator = manipulator
+        self.target_theta = target_theta
 
 
-    def get_listener_funcs(queue, manipulator):
+    def get_listener_funcs(self, queue, manipulator):
         def on_press(key):
             command = {'func': 'idle', 'params': None}
             try:
@@ -181,10 +182,10 @@ class ExpertActionStream():
         return on_press, on_release
 
 
-    def listen_keys(on_press, on_release):
+    def listen_keys(self, on_press, on_release):
         pygame.init()
-        width = 1080
-        height = 720
+        width = 1920
+        height = 1080
         white = (255, 255, 255)
         green = (10, 70, 0)
         blue = (200, 200, 255)
@@ -196,24 +197,42 @@ class ExpertActionStream():
         text1 = font.render("Finger 1: Move with w, a, s, d , Retract with 1", True, green, blue)
         text2 = font.render("Finger 2: Move with i, j, k, l , Retract with 2", True, green, blue)
         text3 = font.render("Finger 3: Move with up, down, left, right,  Retract with 3", True, green, blue)
-        text4 = font.render("Quit with Esc, or q", True, (255, 0, 0), (0,0,0))
+        text_quit = font.render("Quit with Esc, or q", True, (255, 0, 0), (0,0,0))
         textRect1 = text1.get_rect()
-        textRect1.center = (width//2, height//2 - fontsize)
+        textRect1 = (0, fontsize)
         textRect2 = text2.get_rect()
-        textRect2.center = (width//2, height//2)
+        textRect2 = (0, 2 * fontsize)
         textRect3 = text3.get_rect()
-        textRect3.center = (width//2, height//2 + fontsize)
-        textRect4 = text3.get_rect()
-        textRect4.center = (width//2, fontsize//2)
+        textRect3 = (0, 3*fontsize)
+        quitRect = text_quit.get_rect()
+        quitRect = (0,0)
+
+
+
+
         clock = pygame.time.Clock()
         run = True
         while run:
             clock.tick(5)
+
+            try:
+                current_angle = self.manipulator.get_pos()[-1]
+            except:
+                print("AAAAA")
+            target_angle = self.target_theta
+            text_current = font.render(f"Current angle: {current_angle}", True, white, (0,0,0))
+            text_target = font.render(f"Target angle: {target_angle}", True, white, (0,0,0))
+            targetRect = text_target.get_rect()
+            currentRect = text_current.get_rect()
+            targetRect.center = (width//2, height//2 + fontsize) 
+            currentRect.center = (width//2, height//2)
             window.fill(white)
+            window.blit(text_target, targetRect)
+            window.blit(text_current, currentRect)
             window.blit(text1, textRect1)
             window.blit(text2, textRect2)
             window.blit(text3, textRect3)
-            window.blit(text4, textRect4)
+            window.blit(text_quit, quitRect)
             pygame.display.update()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -227,8 +246,8 @@ class ExpertActionStream():
 
     def __enter__(self):
         self.communication_queue = Queue()
-        on_press, on_release = ExpertActionStream.get_listener_funcs(self.communication_queue, self.manipulator)
-        self.listener_process = Process(target=ExpertActionStream.listen_keys, args=(on_press, on_release))
+        on_press, on_release = self.get_listener_funcs(self.communication_queue, self.manipulator)
+        self.listener_process = Process(target=self.listen_keys, args=(on_press, on_release))
         self.listener_process.start()
         print("Starting keyboard listener.")
         return self.listener_process, self.communication_queue
@@ -241,7 +260,7 @@ class ExpertActionStream():
 
 if __name__ == "__main__":
     manipulator = SoftFingerModules()
-    with ExpertActionStream(manipulator) as action_listener:
+    with ExpertActionStream(manipulator, np.pi/2) as action_listener:
         process = action_listener[0]
         queue = action_listener[1]
         while process.is_alive():

@@ -6,7 +6,7 @@ import numpy as np
 
 
 class SoftFingerModulesEnv(gym.Env):
-    def __init__(self):
+    def __init__(self, nominal_theta = np.pi/2):
         self.hardware = SoftFingerModules()
         low = [self.hardware.min['left'], self.hardware.min['right']] * 3
         high = [self.hardware.max['left'], self.hardware.max['right']]* 3
@@ -37,10 +37,12 @@ class SoftFingerModulesEnv(gym.Env):
             dtype=np.float64
         )
 
+        self.action_size = self.action_space.shape[0]
+        self.observation_size = self.observation_space.shape[0]
 
         self.last_action = self.hardware.theta_joints_nominal
         self.last_pos = self.hardware.theta_joints_nominal
-        self.nominal_theta = 0.5
+        self.nominal_theta = nominal_theta
 
 
     def _get_obs(self):
