@@ -80,7 +80,7 @@ def create_expert_policy(env, expert_listener, state_channel):
                 pass
         while not state_channel.empty():
             state_channel.get()
-        state_channel.put(env.hardware.object_pos)
+        state_channel.put(state[-1])
         return action
     return expert_policy
 
@@ -97,8 +97,8 @@ if __name__ == "__main__":
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Using {device} device for torch.')
     np.random.seed(6)
-    num_steps = 100
-    target_theta = 0
+    num_steps = 120
+    target_theta = env.nominal_theta
 
     with ExpertActionStream(env.hardware, target_theta) as action_listener:
         process, action_channel, state_channel = action_listener

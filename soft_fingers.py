@@ -25,11 +25,12 @@ class SoftFingerModules():
         self.max = {"left": self.mid + range/4, "right": self.mid + 3 *range/4}
         self.finger_default = (self.min["left"], self.max["right"])
         self.theta_joints_nominal = np.array(self.finger_default * 3)
+        self.theta_obj_nominal = np.pi
         # self.theta_joints_nominal = np.array([self.mid] * 6)
 
         self.func_names = {'move': self.finger_move,
                            'delta': self.finger_delta,
-                           'idle': lambda: self.get_pos()[-1]}
+                           'idle': self.get_pos_fingers}
         time.sleep(0.1)
         self.reset()
 
@@ -37,15 +38,15 @@ class SoftFingerModules():
         self.all_move(self.theta_joints_nominal)
         self.servos.engage_motor(self.object_id, True)
         self.move_object(self.mid)
-        err_thresh = 0.05
-        errs = np.array([np.inf] * 1)
-        while np.any(errs > err_thresh):
-            curr = self.get_pos()
-            errs = np.abs(curr[-1] - np.pi)
         self.servos.engage_motor(self.object_id, False)
 
-    def move_object(self, pos):
+    def move_object(self, pos, err_thresh=0.01):
+        errs = np.array([np.inf] * 1)
         self.servos.set_des_pos([self.servos.motor_id[-1]], [pos])
+        while np.any(errs > err_thresh):
+            curr = self.get_pos_obj()
+            errs = np.abs(curr - self.theta_obj_nominal)
+        self.object_pos = curr[0]
 
     def finger_delta(self, finger_num, dir, mag=0.15):
         movements = {"up": np.array([mag, -mag]),
@@ -55,7 +56,7 @@ class SoftFingerModules():
         assert dir in movements.keys()
         assert finger_num in [0, 1, 2]
         delta = movements[dir]
-        pos = self.get_pos()[:-1]
+        pos = self.get_pos_fingers()
         left = (finger_num)*2
         right = (finger_num)*2+2
         pos[left: right] = pos[left: right] + delta
@@ -65,7 +66,7 @@ class SoftFingerModules():
         assert finger_num in [0, 1, 2]
         left = (finger_num)*2
         right = (finger_num)*2+2
-        pos = self.get_pos()[:-1]
+        pos = self.get_pos_fingers()
         pos[left:right] = finger_pos
         return pos
 
@@ -79,23 +80,31 @@ class SoftFingerModules():
         errs = np.array([np.inf] * 6)
         start = time.time()
         while np.any(errs > err_thresh):
-            all_curr = self.get_pos()
-            curr = all_curr[:-1]
+            curr = self.get_pos_fingers()
             errs = np.abs(curr - pos)
             elapsed = time.time() - start
             if elapsed > timeout:
                 break 
-        self.object_pos = all_curr[-1]
+        self.object_pos = self.get_pos_obj()[0]
             
-    def get_pos(self):
+    def get_pos_all(self):
         return self.servos.get_pos(self.servos.motor_id)
+    
+    def get_pos_fingers(self):
+        return self.servos.get_pos(self.servos.motor_id[:-1])
+
+    def get_pos_obj(self):
+        return self.servos.get_pos([self.servos.motor_id[-1]])
 
     def parse(self, command):
         func_name = command['func']
         assert func_name in self.func_names
         func = self.func_names[func_name]
         params = command['params']
-        action = func(*params)
+        if params is not None:
+            action = func(*params)
+        else:
+            action = func()
         return action
 
 
@@ -111,6 +120,10 @@ class ExpertActionStream():
     def get_listener_funcs(self, queue):
         def on_press(key):
             command = {'func': 'idle', 'params': None}
+
+            if key == pygame.K_4:
+                command = {'func': 'idle', 'params': None}
+
             try:
                 if key == pygame.K_1:
                     command = {'func': 'move', 'params': (
@@ -202,22 +215,25 @@ class ExpertActionStream():
         quitRect = (0,0)
 
 
-        current_angle = self.manipulator.object_pos
+        current_error = self.manipulator.object_pos
         clock = pygame.time.Clock()
         run = True
         while run:
             clock.tick(5)
             try:
-                current_angle = self.state_channel.get_nowait()
+                current_error = self.state_channel.get_nowait()
             except Empty:
                 pass
             target_angle = self.target_theta
-            text_current = font.render(f"Current angle: {current_angle}", True, white, (0,0,0))
-            text_target = font.render(f"Target angle: {target_angle}", True, white, (0,0,0))
+
+            if current_error > 0:
+                plus = '+'
+            text_current = font.render(f"Current angular error: {plus} {current_error} rad", True, white, (0,0,0))
+            text_target = font.render(f"                Target angle: {target_angle} rad", True, white, (0,0,0))
             targetRect = text_target.get_rect()
             currentRect = text_current.get_rect()
-            targetRect.center = (width//2, height//2 + fontsize) 
-            currentRect.center = (width//2, height//2)
+            targetRect = (width//3, height//2 + fontsize) 
+            currentRect = (width//3, height//2)
             window.fill(white)
             window.blit(text_target, targetRect)
             window.blit(text_current, currentRect)

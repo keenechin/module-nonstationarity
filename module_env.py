@@ -6,7 +6,7 @@ import numpy as np
 
 
 class SoftFingerModulesEnv(gym.Env):
-    def __init__(self, nominal_theta = np.pi/2):
+    def __init__(self, nominal_theta = 0):
         self.hardware = SoftFingerModules()
         low = [self.hardware.min['left'], self.hardware.min['right']] * 3
         high = [self.hardware.max['left'], self.hardware.max['right']]* 3
@@ -46,7 +46,7 @@ class SoftFingerModulesEnv(gym.Env):
 
 
     def _get_obs(self):
-        all_theta = self.hardware.get_pos()
+        all_theta = self.hardware.get_pos_all()
         theta_joints = all_theta[0:6]
         theta_t_obj = all_theta[6]
         theta_t_obj_sincos = [np.sin(theta_t_obj), np.cos(theta_t_obj)]
@@ -65,7 +65,7 @@ class SoftFingerModulesEnv(gym.Env):
     def step(self, action):
         self.hardware.all_move(action)
         self.last_action = action
-        self.last_pos = self.hardware.get_pos()[:-1]
+        self.last_pos = self.hardware.get_pos_fingers()
         state = self._get_obs()
         reward = self.reward(state)
         return state, reward, False, {}
