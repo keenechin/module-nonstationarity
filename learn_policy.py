@@ -1,10 +1,10 @@
-from multiprocessing import process
 import gym
 from queue import Empty
 from os.path import exists
 import numpy as np
 from numpy import random
 from numpy.core.numeric import roll
+from numpy.lib.nanfunctions import nancumsum
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,13 +12,15 @@ import torch.optim as optim
 import time
 import pickle
 import pdb
+import pandas as pd
 from soft_fingers import ExpertActionStream
+from enum import Enum, auto
 
 
 class DynamicsModel():
     def __init__(self, input_size, output_size):
         hidden_size = (input_size + output_size)//2
-        self.network = torch.Sequential(
+        self.network = nn.Sequential(
             nn.Linear(input_size, hidden_size),
             nn.ReLU(),
             nn.Linear(hidden_size, hidden_size),
@@ -26,8 +28,18 @@ class DynamicsModel():
             nn.Linear(hidden_size, output_size)
         )
 
-    def fit(self, X, y):
-        pass
+        self.loss_fn = nn.MSELoss()
+
+    def fit(self, X, y, learning_rate = 0.003):
+        optimizer = torch.optim.SGD(self.network.parameters(), lr=learning_rate)
+        pred = self.network(X)
+        loss = self.loss_fn(pred, y)
+
+        # Backpropagation
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
 
     def predict(self, X):
         return self.network(X)
@@ -45,7 +57,7 @@ def rollout(env, policy, params, num_steps):
         y[i,:] = [*next_state]
         rewards[i] = reward
         state = next_state
-    return X, y, rewards
+    return torch.from_numpy(X).type(torch.FloatTensor), torch.from_numpy(y).type(torch.FloatTensor), rewards
 
 def learn_model(env, policy, params, N):
     input_size = env.observation_space.shape[0] + env.action_space.shape[0]
@@ -56,7 +68,7 @@ def learn_model(env, policy, params, N):
     X, y, rewards = rollout(env, policy, params, N)
     model.fit(X,y)
     print("Model Trained.")
-    return model, X, y
+    return model, X, y, rewards
 
 
 def create_random_policy(env):
@@ -84,23 +96,54 @@ def create_expert_policy(env, expert_listener, state_channel):
         return action
     return expert_policy
 
+class PolicyType(Enum):
+    EXPERT = auto()
+    LEARNED = auto()
+    RANDOM = auto()
+
+def test_model(rollout, env, random_policy, model, num_steps):
+    X_traj, Y_traj, rewards = rollout(env, random_policy, None, num_steps)
+
+            # Test
+    test_loss = 0
+    with torch.no_grad():
+        for X,Y  in zip(X_traj, Y_traj): 
+            pred = model.predict(X)
+            test_loss += model.loss_fn(pred, Y) 
+            
+    print(f"Loss: {test_loss}")
+
 if __name__ == "__main__":
     gym.envs.register(
         id='SoftFingerModulesEnv-v0',
         entry_point='module_env:SoftFingerModulesEnv',
         kwargs={}
     )
-    # env_name = 'CartPole-v1'
     env_name = 'SoftFingerModulesEnv-v0'
-
     env = gym.make(env_name)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Using {device} device for torch.')
-    np.random.seed(6)
-    num_steps = 120
+    modes = {}
+    np.random.seed(7)
+    num_steps = 100
     target_theta = env.nominal_theta
+    random_policy = create_random_policy(env)
+    mode = PolicyType.RANDOM
 
-    with ExpertActionStream(env.hardware, target_theta) as action_listener:
-        process, action_channel, state_channel = action_listener
-        X,y,rewards = rollout(env, create_expert_policy(env, action_channel, state_channel), None, num_steps)
-    print(f"X: {X}\ny: {y}\nRewards: {rewards} ")
+    if mode == PolicyType.EXPERT:
+        with ExpertActionStream(env.hardware, target_theta) as action_listener:
+            process, action_channel, state_channel = action_listener
+            expert_policy = create_expert_policy(env, action_channel, state_channel)
+            model, x, y, rewards = learn_model(env, expert_policy, None, num_steps)
+            test_model(rollout, env, expert_policy, model, 5)
+    
+    elif mode == PolicyType.RANDOM:
+        model, x, y, rewards = learn_model(env, random_policy, None, num_steps)
+        # test_model(rollout, env, random_policy, model, 5)
+
+    dataset = np.hstack((x, y , rewards))
+    with open("dataset.pickle", 'wb') as f:
+        pickle.dump(dataset, f)
+
+    
+    env.reset()
