@@ -8,7 +8,7 @@ import pygame
 
 class SoftFingerModules():
     def __init__(self, motor_type="X",
-                 device="/dev/ttyUSB0", baudrate=57600, protocol=2):
+                 device="/dev/ttyUSB0", baudrate=57600, protocol=2, operating_torque = 90):
 
         self.finger1_id = [40, 41]
         self.finger2_id = [42, 43]
@@ -17,7 +17,7 @@ class SoftFingerModules():
         self.servos = dxl(motor_id=[
             *self.finger1_id, *self.finger2_id, *self.finger3_id, *self.object_id],
             motor_type=motor_type,
-            devicename=device, baudrate=baudrate, protocol=protocol)
+            devicename=device, baudrate=baudrate, protocol=protocol, operating_torque=operating_torque)
         self.servos.open_port()
         self.mid = np.pi
         range = 2.1
@@ -70,7 +70,7 @@ class SoftFingerModules():
         pos[left:right] = finger_pos
         return pos
 
-    def all_move(self, pos, err_thresh=0.05, timeout=0.3):
+    def all_move(self, pos, err_thresh=0.05, derr_thresh=0.1, timeout=0.2):
         for i in range(len(pos)): 
             if i%2 == 0:
                 pos[i] = np.clip(pos[i], self.min['left'], self.max['left'])
@@ -78,13 +78,24 @@ class SoftFingerModules():
                 pos[i] = np.clip(pos[i], self.min['right'], self.max['right'])
         self.servos.set_des_pos(self.servos.motor_id[:-1], pos)
         errs = np.array([np.inf] * 6)
+        last_errs = np.array([np.inf] * 6)
         start = time.time()
         while np.any(errs > err_thresh):
             curr = self.get_pos_fingers()
             errs = np.abs(curr - pos)
+            derrs = np.abs(last_errs - errs)
+            last_errs = errs
             elapsed = time.time() - start
-            if elapsed > timeout:
+            timedout = elapsed > timeout
+            finger_err = np.empty((3,2))
+            not_improving = np.empty((3,1))
+            for i in range(3):
+                finger_err[i,:] = derrs[2*i: 2*i+2]
+                not_improving[i] = np.all(finger_err[i,:] < [derr_thresh]*2)
+                
+            if  timedout and np.any(not_improving):
                 break 
+        # print(errs)
         self.object_pos = self.get_pos_obj()[0]
             
     def get_pos_all(self):

@@ -14,6 +14,7 @@ class Dynamixel_X():
         # Control table address is different in Dynamixel model
         self.ADDR_TORQUE_ENABLE = 64
         self.ADDR_GOAL_POSITION = 116
+        self.ADDR_GOAL_TORQUE = 102
         self.ADDR_PRESENT_POSITION = 132
         self.ADDR_PRESENT_VELOCITY = 128
         # Trick to get position and velocity at once
@@ -88,7 +89,7 @@ COMM_SUCCESS = 0                             # Communication Success result valu
 class dxl():
 
     # devicename: Port name being used on your controller # ex) Windows: "COM1"   Linux: "/dev/ttyUSB0" Mac: "/dev/tty.usbserial-*"
-    def __init__(self, motor_id, motor_type="X", baudrate=1000000, devicename="/dev/ttyUSB0", protocol=2):
+    def __init__(self, motor_id, motor_type="X", baudrate=1000000, devicename="/dev/ttyUSB0", protocol=2, operating_torque = DXL_MAX_CW_TORQUE_VALUE):
 
         self.motor_id = motor_id
         self.motor_type = motor_type
@@ -96,6 +97,7 @@ class dxl():
         self.devicename = devicename
         self.protocol = protocol
         self.n_motors = len(motor_id)
+        self.operating_torque = operating_torque
 
         if motor_type == "MX":
             self.motor = Dynamixel_MX()
@@ -134,8 +136,16 @@ class dxl():
         else:
             quit("Failed to change the baudrate!")
 
+
+        # Set Operating Mode
+        for id in self.motor_id[:-1]:
+            dynamixel.write2ByteTxRx(
+                    self.port_num, self.protocol, id, self.motor.ADDR_OPERATION_MODE, int(5))
+            dynamixel.write2ByteTxRx(
+                    self.port_num, self.protocol, id, self.motor.ADDR_GOAL_TORQUE, self.operating_torque)
         # Enable Dynamixel Torque
         self.engage_motor(self.motor_id, True)
+
 
         # Initialize Group instance
 
