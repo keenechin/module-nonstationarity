@@ -57,6 +57,9 @@ def rollout(env, policy, params, num_steps):
         y[i,:] = [*next_state]
         rewards[i] = reward
         state = next_state
+        if (num_steps % 1000) == 0:
+            print(f"Completed {i} steps, cooling down for 30s.")
+            time.sleep(30)
     return torch.from_numpy(X).type(torch.FloatTensor), torch.from_numpy(y).type(torch.FloatTensor), rewards
 
 def learn_model(env, policy, params, N):
@@ -125,25 +128,30 @@ if __name__ == "__main__":
     print(f'Using {device} device for torch.')
     modes = {}
     np.random.seed(7)
-    num_steps = 100
     target_theta = env.nominal_theta
     random_policy = create_random_policy(env)
     mode = PolicyType.RANDOM
 
-    if mode == PolicyType.EXPERT:
-        with ExpertActionStream(env.hardware, target_theta) as action_listener:
-            process, action_channel, state_channel = action_listener
-            expert_policy = create_expert_policy(env, action_channel, state_channel)
-            model, x, y, rewards = learn_model(env, expert_policy, None, num_steps)
-            test_model(rollout, env, expert_policy, model, 5)
-    
-    elif mode == PolicyType.RANDOM:
-        model, x, y, rewards = learn_model(env, random_policy, None, num_steps)
-        # test_model(rollout, env, random_policy, model, 5)
+    for i in range(10):
+        num_steps = 50 * 2 **(i+1)
+        print(f"Collecting {num_steps} sample dataset.")
+        if mode == PolicyType.EXPERT:
+            with ExpertActionStream(env.hardware, target_theta) as action_listener:
+                process, action_channel, state_channel = action_listener
+                expert_policy = create_expert_policy(env, action_channel, state_channel)
+                model, x, y, rewards = learn_model(env, expert_policy, None, num_steps)
+                test_model(rollout, env, expert_policy, model, 5)
+        
+        elif mode == PolicyType.RANDOM:
+            model, x, y, rewards = learn_model(env, random_policy, None, num_steps)
+            # test_model(rollout, env, random_policy, model, 5)
 
-    dataset = np.hstack((x, y , rewards))
-    with open("dataset.pickle", 'wb') as f:
-        pickle.dump(dataset, f)
+        dataset = np.hstack((x, y , rewards))
+        with open(f"data/dataset_N{num_steps}.pickle", 'wb') as f:
+            pickle.dump(dataset, f)
+        
+        print(f"{num_steps} sample dataset collected, cooling down.")
+        env.reset()
+        time.sleep(60)
 
-    
-    env.reset()
+        
