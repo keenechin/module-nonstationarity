@@ -10,8 +10,8 @@ class SoftFingerModules():
     def __init__(self, motor_type="X",
                  device="/dev/ttyUSB0", baudrate=57600, protocol=2, operating_torque = 80):
 
-        self.finger1_id = [40, 41]
-        self.finger2_id = [42, 43]
+        self.finger1_id = [42, 43]
+        self.finger2_id = [40, 41]
         self.finger3_id = [44, 45]
         self.object_id = [50]
         self.servos = dxl(motor_id=[
