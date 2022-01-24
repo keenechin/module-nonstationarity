@@ -95,7 +95,7 @@ def create_expert_policy(env, expert_listener, state_channel):
         while True:
             try:
                 command = expert_listener.get()
-                try: 
+                try:
                     action = env.hardware.parse(command)
                     break
                 except TypeError:
@@ -121,11 +121,10 @@ def test_model(rollout, env, random_policy, model, num_steps):
             # Test
     test_loss = 0
     with torch.no_grad():
-        for X,Y  in zip(X_traj, Y_traj): 
+        for X,Y  in zip(X_traj, Y_traj):
             pred = model.predict(X)
-            test_loss += model.loss_fn(pred, Y) 
+            test_loss += model.loss_fn(pred, Y)
     test_loss = test_loss / num_steps
-            
     print(f"Loss: {test_loss}")
 
 if __name__ == "__main__":
@@ -163,13 +162,10 @@ if __name__ == "__main__":
                 x, y, rewards = rollout(env, expert_policy, None, num_steps)
                 model, x, y, rewards = learn_model(model, x, y, rewards)
                 test_model(rollout, env, expert_policy, model, 5)
-        
         elif mode == PolicyType.RANDOM:
             x, y, rewards = rollout(env, random_policy, None, num_steps)
             model, x, y, rewards = learn_model(model, x, y, rewards)
-        
             # test_model(rollout, env, random_policy, model, 5)
-        
         elif mode == PolicyType.STATIC:
             num_training = 62600
             x, y, rewards = accumulate_data(env, num_points=num_training)
@@ -188,7 +184,6 @@ if __name__ == "__main__":
             dataset = np.hstack((x, y , torch.unsqueeze(rewards, 1)))
             with open(f"data/dataset_N{num_steps}.pickle", 'wb') as f:
                 pickle.dump(dataset, f)
-        
             print(f"{num_steps} sample dataset collected, cooling down.")
             env.reset()
             time.sleep(60)
@@ -196,4 +191,3 @@ if __name__ == "__main__":
         time.sleep(1)
         env.reset()
 
-        

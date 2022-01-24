@@ -20,7 +20,7 @@ class SoftFingerModulesEnv(gym.Env):
         # the joint velocities,
         # the sine and cosine values of the object’s angle,
         # the last action, the error between the goal and the current object angle
-        # 
+
         self.observation_space = spaces.Box(
             low=np.array([
                 *[self.hardware.min['left'], self.hardware.min['right']] * 3,
@@ -113,7 +113,6 @@ if __name__ == "__main__":
         env.step(action)
         print(env.last_pos - action)
         input("Press any key to continue.")
-
 
     env.reset()
 
