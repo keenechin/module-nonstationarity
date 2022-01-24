@@ -11,6 +11,7 @@ from soft_fingers import ExpertActionStream
 from enum import Enum, auto
 from process_dataset import accumulate_data
 from learned_dynamics_env import LearnedDynamicsEnv
+from stable_baselines3 import PPO
 
 
 class DynamicsModel():
@@ -210,6 +211,8 @@ if __name__ == "__main__":
     )
     software_env_name = 'ModulesSimulationEnv-v0'
     software_env = gym.make(software_env_name)
+    policy = PPO('MlpPolicy', software_env, verbose=1)
+    policy.learn(total_timesteps=10000)
     
     
 
