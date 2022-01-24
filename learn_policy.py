@@ -1,19 +1,16 @@
 import gym
 from queue import Empty
-from os.path import exists
 import numpy as np
-from numpy import random
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
 import time
 import pickle
-import pdb
-import pandas as pd
+import tkinter as tk
+from tkinter import filedialog
 from soft_fingers import ExpertActionStream
 from enum import Enum, auto
 from process_dataset import accumulate_data
+from learned_dynamics_env import LearnedDynamicsEnv
 
 
 class DynamicsModel():
@@ -108,11 +105,11 @@ def create_expert_policy(env, expert_listener, state_channel):
         return action
     return expert_policy
 
-class PolicyType(Enum):
-    EXPERT = auto()
-    LEARNED = auto()
-    RANDOM = auto()
-    STATIC = auto()
+class DynamicsSource(Enum):
+    EXPERT_POLICY = auto()
+    RANDOM_POLICY = auto()
+    SAVED_DATA = auto()
+    TRAINED_MODEL = auto()
 
 
 def test_model(rollout, env, random_policy, model, num_steps):
@@ -127,46 +124,52 @@ def test_model(rollout, env, random_policy, model, num_steps):
     test_loss = test_loss / num_steps
     print(f"Loss: {test_loss}")
 
-if __name__ == "__main__":
-    gym.envs.register(
-        id='SoftFingerModulesEnv-v0',
-        entry_point='module_env:SoftFingerModulesEnv',
-        kwargs={}
-    )
-    env_name = 'SoftFingerModulesEnv-v0'
-    env = gym.make(env_name)
+def import_model():
+    root = tk.Tk()
+    root.withdraw()
+    file_path = filedialog.askopenfilename()
+    with open(file_path, 'rb') as f:
+        model = pickle.load(f)
+    import time
+    time.sleep(4)
+    return model
+
+def get_dynamics_model(env, mode = DynamicsSource.SAVED_DATA):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f'Using {device} device for torch.')
-    modes = {}
     np.random.seed(7)
+    if mode == DynamicsSource.TRAINED_MODEL:
+        return import_model()
+
     target_theta = env.nominal_theta
     random_policy = create_random_policy(env)
-    mode = PolicyType.STATIC
 
-    num_files = 10
     num_files = 1
     for i in range(num_files):
         num_steps = 50 * 2 **(i+1)
         model = get_model(env)
-        if mode != PolicyType.STATIC:
+        
+        if mode == DynamicsSource.SAVED_DATA or DynamicsSource.TRAINED_MODEL:
+            save_mode = False
+        else:
             save_mode = True
             print(f"Collecting {num_steps} sample dataset.")
-        else:
-            save_mode = False
 
 
-        if mode == PolicyType.EXPERT:
+        if mode == DynamicsSource.EXPERT_POLICY:
             with ExpertActionStream(env.hardware, target_theta) as action_listener:
                 process, action_channel, state_channel = action_listener
                 expert_policy = create_expert_policy(env, action_channel, state_channel)
                 x, y, rewards = rollout(env, expert_policy, None, num_steps)
                 model, x, y, rewards = learn_model(model, x, y, rewards)
-                test_model(rollout, env, expert_policy, model, 5)
-        elif mode == PolicyType.RANDOM:
+                # test_model(rollout, env, expert_policy, model, 5)
+
+        if mode == DynamicsSource.RANDOM_POLICY:
             x, y, rewards = rollout(env, random_policy, None, num_steps)
             model, x, y, rewards = learn_model(model, x, y, rewards)
             # test_model(rollout, env, random_policy, model, 5)
-        elif mode == PolicyType.STATIC:
+
+        if mode == DynamicsSource.SAVED_DATA:
             num_training = 62600
             x, y, rewards = accumulate_data(env, num_points=num_training)
             x = torch.from_numpy(x).type(torch.FloatTensor)
@@ -178,8 +181,6 @@ if __name__ == "__main__":
                 pickle.dump(model, f)
             # test_model(rollout, env, random_policy, model, 40)
 
-
-
         if save_mode:
             dataset = np.hstack((x, y , torch.unsqueeze(rewards, 1)))
             with open(f"data/dataset_N{num_steps}.pickle", 'wb') as f:
@@ -190,4 +191,26 @@ if __name__ == "__main__":
 
         time.sleep(1)
         env.reset()
+        return model
+
+if __name__ == "__main__":
+    gym.envs.register(
+        id='SoftFingerModulesEnv-v0',
+        entry_point='module_env:SoftFingerModulesEnv',
+        kwargs={}
+    )
+    hardware_env_name = 'SoftFingerModulesEnv-v0'
+    hardware_env = gym.make(hardware_env_name)
+    dynamics = get_dynamics_model(hardware_env, mode=DynamicsSource.TRAINED_MODEL)
+
+    gym.envs.register(
+        id='ModulesSimulationEnv-v0',
+        entry_point='learned_dynamics_env:LearnedDynamicsEnv',
+        kwargs={'hardware_env':hardware_env, 'dynamics':dynamics}
+    )
+    software_env_name = 'ModulesSimulationEnv-v0'
+    software_env = gym.make(software_env_name)
+    
+    
+
 
