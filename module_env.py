@@ -94,19 +94,37 @@ class SoftFingerModulesEnv(gym.Env):
                 + 10 * self.one_if(np.abs(dtheta_obj), thresh=0.25) \
                 + 50 * self.one_if(np.abs(dtheta_obj), thresh=0.10)
 
+    def get_pos_fingers(self):
+        return self.hardware.get_pos_fingers()
+
+    def finger_delta(self, finger_num, dir):
+        return self.hardware.finger_delta(finger_num, dir)
+
+    def finger_move(self, finger_num, finger_pos):
+        return self.hardware.finger_move(finger_num, finger_pos)
+
+    @property
+    def object_pos(self):
+        return self.hardware.object_pos
+
+    @property
+    def finger_default(self):
+        return self.hardware.finger_default
+
     def reset(self):
         self.hardware.reset()
         return self._get_obs()
 
+gym.envs.register(
+    id='SoftFingerModulesEnv-v0',
+    entry_point='module_env:SoftFingerModulesEnv',
+    kwargs={}
+)
+
+env_name = 'SoftFingerModulesEnv-v0'
 
 if __name__ == "__main__":
-    gym.envs.register(
-        id='SoftFingerModulesEnv-v0',
-        entry_point='module_env:SoftFingerModulesEnv',
-        kwargs={}
-    )
-    import time
-    env_name = 'SoftFingerModulesEnv-v0'
+
     env = gym.make(env_name)
     for i in range(100):
         action = env.action_space.sample()

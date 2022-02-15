@@ -28,9 +28,7 @@ class SoftFingerModules():
         self.theta_obj_nominal = np.pi
         # self.theta_joints_nominal = np.array([self.mid] * 6)
 
-        self.func_names = {'move': self.finger_move,
-                           'delta': self.finger_delta,
-                           'idle': self.get_pos_fingers}
+
         time.sleep(0.1)
         self.reset()
 
@@ -107,6 +105,18 @@ class SoftFingerModules():
     def get_pos_obj(self):
         return self.servos.get_pos([self.servos.motor_id[-1]])
 
+
+
+
+
+class ExpertActionStream():
+    def __init__(self, manipulator, target_theta):
+        self.manipulator = manipulator
+        self.target_theta = target_theta
+        self.func_names = {'move': manipulator.finger_move,
+                    'delta': manipulator.finger_delta,
+                    'idle': manipulator.get_pos_fingers}
+
     def parse(self, command):
         func_name = command['func']
         assert func_name in self.func_names
@@ -117,15 +127,6 @@ class SoftFingerModules():
         else:
             action = func()
         return action
-
-
-
-
-
-class ExpertActionStream():
-    def __init__(self, manipulator, target_theta):
-        self.manipulator = manipulator
-        self.target_theta = target_theta
 
 
     def get_listener_funcs(self, queue):
@@ -270,7 +271,7 @@ class ExpertActionStream():
         self.listener_process = Process(target=self.listen_keys, args=(on_press, on_release))
         self.listener_process.start()
         print("Starting keyboard listener.")
-        return self.listener_process, self.action_channel, self.state_channel
+        return self, self.listener_process, self.action_channel, self.state_channel
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         print("Closing keyboard listener.")
@@ -281,13 +282,13 @@ class ExpertActionStream():
 if __name__ == "__main__":
     manipulator = SoftFingerModules()
     with ExpertActionStream(manipulator, 0) as action_listener:
-        process, action_channel, state_channel = action_listener
+        obj, process, action_channel, state_channel = action_listener
         
         while process.is_alive():
             try:
                 command = action_channel.get(False)
                 try:
-                    pos = manipulator.parse(command)
+                    pos = obj.parse(command)
                     manipulator.all_move(pos)
                     while not state_channel.empty():
                         state_channel.get()
