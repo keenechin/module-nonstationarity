@@ -62,13 +62,16 @@ class SoftFingerModulesEnv(gym.Env):
         return state 
 
     
-    def step(self, action):
+    def step(self, action, thresh=0.01):
         self.hardware.all_move(action)
         self.last_action = action
         self.last_pos = self.hardware.get_pos_fingers()
         state = self._get_obs()
         reward = self.reward(state)
-        return state, reward, False, {}
+        err = np.abs(self.object_pos - self.nominal_theta)
+        done = err < thresh
+        print(done)
+        return state, reward, done, {}
 
     def decompose(self, state):
         theta_joints = state[0:6]
@@ -105,7 +108,7 @@ class SoftFingerModulesEnv(gym.Env):
 
     @property
     def object_pos(self):
-        return self.hardware.object_pos
+        return self.hardware.get_pos_obj()[0]
 
     @property
     def finger_default(self):
@@ -126,6 +129,7 @@ env_name = 'SoftFingerModulesEnv-v0'
 if __name__ == "__main__":
 
     env = gym.make(env_name)
+    env.reset()
     for i in range(100):
         action = env.action_space.sample()
         env.step(action)

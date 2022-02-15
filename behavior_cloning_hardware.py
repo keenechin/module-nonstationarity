@@ -17,21 +17,35 @@ def generate_expert_traj(env, n_timesteps=0, n_episodes=100):
     obs = env.reset()
     episode_starts.append(True)
     reward_sum = 0.0
-    idx = 0
+
 
 
     
     with ExpertActionStream(manipulator=env, target_theta=0) as action_listener:
         obj, process, action_channel, state_channel = action_listener
+
         while process.is_alive() and ep_idx < n_episodes:
             try:
                 command = action_channel.get(False)
                 try:
                     action = obj.parse(command)
-                    env.step(action)
+                    obs, reward, done, _ = env.step(action)
                     while not state_channel.empty():
                         state_channel.get()
                     state_channel.put(env.object_pos)
+                    observations.append(obs)
+                    actions.append(action)
+                    rewards.append(reward)
+                    episode_starts.append(done)
+                    reward_sum += reward
+
+                    if done:
+                        env.reset()
+                        episode_returns[ep_idx] = reward_sum
+                        reward_sum = 0.0
+                        ep_idx += 1
+
+
                 except TypeError:
                     pass
             except Empty:

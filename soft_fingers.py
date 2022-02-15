@@ -203,8 +203,8 @@ class ExpertActionStream():
 
     def listen_keys(self, on_press, on_release):
         pygame.init()
-        width = 1920
-        height = 1080
+        width = 960
+        height = 540
         white = (255, 255, 255)
         green = (10, 70, 0)
         blue = (200, 200, 255)
@@ -244,8 +244,8 @@ class ExpertActionStream():
             text_target = font.render(f"                Target angle: {target_angle} rad", True, white, (0,0,0))
             targetRect = text_target.get_rect()
             currentRect = text_current.get_rect()
-            targetRect = (width//3, height//2 + fontsize) 
-            currentRect = (width//3, height//2)
+            targetRect = (width//10, height//2 + fontsize) 
+            currentRect = (width//10, height//2)
             window.fill(white)
             window.blit(text_target, targetRect)
             window.blit(text_current, currentRect)
