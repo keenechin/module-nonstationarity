@@ -227,20 +227,21 @@ class ExpertActionStream():
         quitRect = (0,0)
 
 
-        current_error = self.manipulator.object_pos
+        current_error = np.around(self.manipulator.object_pos, 3)
         clock = pygame.time.Clock()
         run = True
         while run:
             clock.tick(5)
             try:
                 current_error = self.state_channel.get_nowait()
+                current_error = np.around(current_error, 3)
             except Empty:
                 pass
-            target_angle = self.target_theta
+            target_angle = np.around(self.target_theta, 3)
 
             if current_error > 0:
                 plus = '+'
-            text_current = font.render(f"Current angular error: {plus} {current_error} rad", True, white, (0,0,0))
+            text_current = font.render(f"Current angular error: {current_error} rad", True, white, (0,0,0))
             text_target = font.render(f"                Target angle: {target_angle} rad", True, white, (0,0,0))
             targetRect = text_target.get_rect()
             currentRect = text_current.get_rect()

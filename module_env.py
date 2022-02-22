@@ -62,7 +62,7 @@ class SoftFingerModulesEnv(gym.Env):
         return state 
 
     
-    def step(self, action, thresh=0.01):
+    def step(self, action, thresh=0.05):
         self.hardware.all_move(action)
         self.last_action = action
         self.last_pos = self.hardware.get_pos_fingers()
@@ -70,7 +70,6 @@ class SoftFingerModulesEnv(gym.Env):
         reward = self.reward(state)
         err = np.abs(self.object_pos - self.nominal_theta)
         done = err < thresh
-        print(done)
         return state, reward, done, {}
 
     def decompose(self, state):
