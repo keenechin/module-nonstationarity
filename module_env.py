@@ -88,13 +88,16 @@ class SoftFingerModulesEnv(gym.Env):
 
 
     def reward(self, state):
-        #rt=−5|∆θt,obj|−‖θnominal−θt‖−∥∥∥ ̇θt∥∥∥+ 101(|∆θt,obj|<0.25) + 501(|∆θt,obj|<0.1
+        #rt=−5|∆θt,obj|−‖θnominal−θt‖−∥∥∥ ̇θt∥∥∥+ 10*1(|∆θt,obj|<0.25) + 50*1(|∆θt,obj|<0.1
         theta_joints, theta_dot_joints, _, _, dtheta_obj = self.decompose(state)
         return -5 * np.abs(dtheta_obj) \
                 -np.linalg.norm(self.hardware.theta_joints_nominal - theta_joints) \
                 -np.linalg.norm(theta_dot_joints) \
                 + 10 * self.one_if(np.abs(dtheta_obj), thresh=0.25) \
                 + 50 * self.one_if(np.abs(dtheta_obj), thresh=0.10)
+
+    def move_obj_random(self):
+        self.hardware.move_obj_random()
 
     def get_pos_fingers(self):
         return self.hardware.get_pos_fingers()
