@@ -2,3 +2,5 @@
 *pycache*
 graphics/
 pytorch*ppo*/
+*.*~
+*(copy)*

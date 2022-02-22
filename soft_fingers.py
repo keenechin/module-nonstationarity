@@ -211,12 +211,17 @@ class ExpertActionStream():
         window = pygame.display.set_mode((width, height))
         pygame.display.set_caption('Soft Finger Keyboard Controller')
         pygame.display.set_icon(pygame.image.load('soft_finger_icon.png'))
+        target_pic = pygame.image.load('target_position.jpg').convert()
+        old_width, old_height = target_pic.get_size()
+        pic_width  = width//3
+        pic_height = old_height * pic_width // old_width 
+        target_pic = pygame.transform.scale(target_pic, (pic_width, pic_height))
         fontsize = 32
         font = pygame.font.Font('freesansbold.ttf', fontsize)
-        text1 = font.render("Finger 1: Move with w, a, s, d , Retract with 1", True, green, blue)
-        text2 = font.render("Finger 2: Move with i, j, k, l , Retract with 2", True, green, blue)
-        text3 = font.render("Finger 3: Move with up, down, left, right,  Retract with 3", True, green, blue)
-        text_quit = font.render("Quit with Esc, or q", True, (255, 0, 0), (0,0,0))
+        text1 = font.render("Finger 1: Move with w, a, s, d , Retract with 1", True, green, blue).convert()
+        text2 = font.render("Finger 2: Move with i, j, k, l , Retract with 2", True, green, blue).convert()
+        text3 = font.render("Finger 3: Move with up, down, left, right,  Retract with 3", True, green, blue).convert()
+        text_quit = font.render("Quit with Esc, or q", True, (255, 0, 0), (0,0,0)).convert()
         textRect1 = text1.get_rect()
         textRect1 = (0, fontsize)
         textRect2 = text2.get_rect()
@@ -254,6 +259,8 @@ class ExpertActionStream():
             window.blit(text2, textRect2)
             window.blit(text3, textRect3)
             window.blit(text_quit, quitRect)
+            window.blit(target_pic, ((width*2)//3, height//3))
+            
             pygame.display.update()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
