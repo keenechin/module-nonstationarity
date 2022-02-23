@@ -240,19 +240,19 @@ class ExpertActionStream():
         quitRect = (0,0)
 
 
-        current_error = np.around(self.manipulator.object_pos, 3)
+        current_angle = np.around(self.manipulator.object_pos, 3)
         clock = pygame.time.Clock()
         run = True
         while run:
             clock.tick(5)
             try:
-                current_error = self.state_channel.get_nowait()
-                current_error = np.around(current_error, 3)
+                current_angle = self.state_channel.get_nowait()
+                current_angle = np.around(current_angle, 3)
             except Empty:
                 pass
             target_angle = np.around(self.target_theta, 3)
-
-            if current_error > 0:
+            current_error = current_angle - target_angle
+            if current_angle > 0:
                 plus = '+'
             text_current = font.render(f"Current angular error: {current_error} rad", True, white, (0,0,0))
             text_target = font.render(f"                Target angle: {target_angle} rad", True, white, (0,0,0))
@@ -297,7 +297,7 @@ class ExpertActionStream():
 
 if __name__ == "__main__":
     manipulator = SoftFingerModules()
-    with ExpertActionStream(manipulator, 0) as action_listener:
+    with ExpertActionStream(manipulator, target_theta=0.0) as action_listener:
         obj, process, action_channel, state_channel = action_listener
         
         while process.is_alive():

@@ -6,7 +6,7 @@ import gym
 
 
 
-def generate_expert_traj(env, n_timesteps=0, n_episodes=100):
+def generate_expert_traj(env, n_episodes=3):
     actions = []
     observations = []
     rewards = []
@@ -51,12 +51,30 @@ def generate_expert_traj(env, n_timesteps=0, n_episodes=100):
             except Empty:
                 pass
             
-
-            
-        
+        env.reset()
         if ep_idx < n_episodes:
             raise RuntimeError(f"Expert stream closed after {ep_idx} episodes, expected {n_episodes}.")
-        env.reset()
+
+        actions = np.array(actions)
+        observations = np.array(observations)
+        rewards = np.array(rewards)
+        episode_returns = np.array(episode_returns)
+        episode_starts = np.array(episode_starts)
+        numpy_dict = {
+            'actions': actions,
+            'obs': observations,
+            'rewards': rewards,
+            'episode_returns': episode_returns,
+            'episode_starts': episode_starts
+        }  # type: Dict[str, np.ndarray]
+
+        for key, val in numpy_dict.items():
+            print(key, val.shape)
+
+        prompt = "Name these trajectories:"
+        save_path = f"{n_episodes}e_{input(prompt)}"
+        if save_path is not None:
+            np.savez(save_path, **numpy_dict)
 
 if __name__ == "__main__":
     env = gym.make(module_env.env_name)
