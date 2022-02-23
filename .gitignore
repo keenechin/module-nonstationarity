@@ -4,3 +4,4 @@ graphics/
 pytorch*ppo*/
 *.*~
 *(copy)*
+*.npz
