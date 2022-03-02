@@ -6,7 +6,7 @@ import gym
 
 
 
-def generate_expert_traj(env, n_episodes=1):
+def generate_expert_traj(env, n_episodes=20):
     actions = []
     observations = []
     rewards = []
