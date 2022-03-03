@@ -27,10 +27,13 @@ class SoftFingerModules():
         self.theta_joints_nominal = np.array(self.finger_default * 3)
         self.theta_obj_nominal = np.pi
         # self.theta_joints_nominal = np.array([self.mid] * 6)
-
+        self.random = np.random.RandomState(118342328)
 
         time.sleep(0.1)
         self.reset()
+    
+    def wrap(self, angle):
+        return np.arctan2(np.sin(angle), np.cos(angle))
 
     def reset(self):
         self.all_move(self.theta_joints_nominal)
@@ -40,17 +43,16 @@ class SoftFingerModules():
         # self.servos.engage_motor(self.object_id, False)
 
     def move_object(self, pos, err_thresh=0.1):
-        print(pos)
         errs = np.array([np.inf] * 1)
         self.servos.set_des_pos([self.servos.motor_id[-1]], [pos])
         while np.any(errs > err_thresh):
             curr = self.get_pos_obj()
-            errs = np.abs(curr - pos)
-        self.object_pos = curr[0]
+            errs = np.abs(curr - self.wrap(pos))
+        self.object_pos = self.wrap(curr[0])
 
     def move_obj_random(self):
         self.servos.engage_motor(self.object_id, True)
-        pos = np.random.uniform(0, 2*np.pi)
+        pos = self.random.uniform(0, 2*np.pi)
         self.move_object(pos) 
         self.servos.engage_motor(self.object_id, False)
 
@@ -105,13 +107,15 @@ class SoftFingerModules():
         self.object_pos = self.get_pos_obj()[0]
             
     def get_pos_all(self):
-        return self.servos.get_pos(self.servos.motor_id)
+        pos =  self.servos.get_pos(self.servos.motor_id)
+        pos[-1] = self.wrap(pos[-1])
+        return pos
     
     def get_pos_fingers(self):
         return self.servos.get_pos(self.servos.motor_id[:-1])
 
     def get_pos_obj(self):
-        return self.servos.get_pos([self.servos.motor_id[-1]])
+        return self.wrap(self.servos.get_pos([self.servos.motor_id[-1]]))
 
 
 

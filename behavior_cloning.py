@@ -26,7 +26,7 @@ class NeuralNetwork(nn.Module):
 
 
 class ExpertDataset(Dataset):
-    def __init__(self, file="20e_mid.npz"):
+    def __init__(self, file="20e_rewrap.npz"):
         self.data =  np.load(file)
         self.obs_size = len(self.data["obs"][0])
         self.actions_size = len(self.data["actions"][0])
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     model = NeuralNetwork(input_size, output_size).to(device)
 
     loss_fn = nn.MSELoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=1e-2)
+    optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
     for i in range(10):
         train(dataloader, model, loss_fn, optimizer)
     
@@ -77,7 +77,7 @@ if __name__ == "__main__":
     import module_env, gym
     env = gym.make(module_env.env_name)
     obs = env.reset()
-    for i in range(1000):
+    for i in range(200):
         obs = torch.from_numpy(np.array([obs])).float().to(device)
         action = model(obs)
         action = action.cpu().detach().numpy()

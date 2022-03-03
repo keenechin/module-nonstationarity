@@ -3,6 +3,7 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 import numpy as np
+import time
 
 
 class SoftFingerModulesEnv(gym.Env):
@@ -53,7 +54,7 @@ class SoftFingerModulesEnv(gym.Env):
         theta_dot_joints = theta_joints - self.last_pos # TODO: Add instantaneous velocity
         last_action = self.last_action
         dtheta_obj = theta_t_obj - self.nominal_theta
-
+        print(dtheta_obj)
         state = np.array([*theta_joints, 
                            *theta_dot_joints,
                            *theta_t_obj_sincos,
@@ -63,6 +64,7 @@ class SoftFingerModulesEnv(gym.Env):
 
     
     def step(self, action, thresh=0.05):
+        time.sleep(0.1)
         self.hardware.all_move(action)
         self.last_action = action
         self.last_pos = self.hardware.get_pos_fingers()
@@ -70,6 +72,7 @@ class SoftFingerModulesEnv(gym.Env):
         reward = self.reward(state)
         err = np.abs(self.object_pos - self.nominal_theta)
         done = err < thresh
+        print(reward)
         return state, reward, done, {}
 
     def decompose(self, state):
@@ -91,8 +94,8 @@ class SoftFingerModulesEnv(gym.Env):
         #rt=−5|∆θt,obj|−‖θnominal−θt‖−∥∥∥ ̇θt∥∥∥+ 10*1(|∆θt,obj|<0.25) + 50*1(|∆θt,obj|<0.1
         theta_joints, theta_dot_joints, _, _, dtheta_obj = self.decompose(state)
         return -5 * np.abs(dtheta_obj) \
-                -np.linalg.norm(self.hardware.theta_joints_nominal - theta_joints) \
-                -np.linalg.norm(theta_dot_joints) \
+                -0*np.linalg.norm(self.hardware.theta_joints_nominal - theta_joints) \
+                -0*np.linalg.norm(theta_dot_joints) \
                 + 10 * self.one_if(np.abs(dtheta_obj), thresh=0.25) \
                 + 50 * self.one_if(np.abs(dtheta_obj), thresh=0.10)
 
@@ -117,6 +120,7 @@ class SoftFingerModulesEnv(gym.Env):
         return self.hardware.finger_default
 
     def reset(self):
+        self.steps = 0
         self.hardware.reset()
         return self._get_obs()
 
