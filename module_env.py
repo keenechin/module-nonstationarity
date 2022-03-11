@@ -7,7 +7,7 @@ import time
 
 
 class SoftFingerModulesEnv(gym.Env):
-    def __init__(self, nominal_theta = 0):
+    def __init__(self, goal_theta = 0):
         self.hardware = SoftFingerModules()
         low = [self.hardware.min['left'], self.hardware.min['right']] * 3
         high = [self.hardware.max['left'], self.hardware.max['right']]* 3
@@ -43,8 +43,13 @@ class SoftFingerModulesEnv(gym.Env):
 
         self.last_action = self.hardware.theta_joints_nominal
         self.last_pos = self.hardware.theta_joints_nominal
-        self.nominal_theta = nominal_theta
+        self.goal_theta = goal_theta
+        self.counter = self.counter_gen()
 
+    def counter_gen(self, start=0):
+        while True:
+            yield start
+            start = start + 1
 
     def _get_obs(self):
         all_theta = self.hardware.get_pos_all()
@@ -53,8 +58,8 @@ class SoftFingerModulesEnv(gym.Env):
         theta_t_obj_sincos = [np.sin(theta_t_obj), np.cos(theta_t_obj)]
         theta_dot_joints = theta_joints - self.last_pos # TODO: Add instantaneous velocity
         last_action = self.last_action
-        dtheta_obj = theta_t_obj - self.nominal_theta
-        print(dtheta_obj)
+        dtheta_obj = theta_t_obj - self.goal_theta
+        print(f"Obj position: {dtheta_obj}")
         state = np.array([*theta_joints, 
                            *theta_dot_joints,
                            *theta_t_obj_sincos,
@@ -62,17 +67,18 @@ class SoftFingerModulesEnv(gym.Env):
                            dtheta_obj])
         return state 
 
-    
+     
     def step(self, action, thresh=0.05):
         time.sleep(0.1)
+        # print(action)
         self.hardware.all_move(action)
         self.last_action = action
         self.last_pos = self.hardware.get_pos_fingers()
         state = self._get_obs()
         reward = self.reward(state)
-        err = np.abs(self.object_pos - self.nominal_theta)
+        err = np.abs(self.object_pos - self.goal_theta)
         done = err < thresh
-        print(reward)
+        print(f"Step: {next(self.counter)}, Reward: {reward}, Done: {done}\n")
         return state, reward, done, {}
 
     def decompose(self, state):
