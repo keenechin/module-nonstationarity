@@ -5,3 +5,5 @@ pytorch*ppo*/
 *.*~
 *(copy)*
 *.npz
+.vscode
+policies/

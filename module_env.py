@@ -9,34 +9,43 @@ import time
 class SoftFingerModulesEnv(gym.Env):
     def __init__(self, goal_theta = 0):
         self.hardware = SoftFingerModules()
-        low = [self.hardware.min['left'], self.hardware.min['right']] * 3
-        high = [self.hardware.max['left'], self.hardware.max['right']]* 3
+        low = [-1.0]
+        high = [1.0]
         self.action_space = spaces.Box(
-            low=np.array(low),
-            high=np.array(high),
+            low=np.array(low * 6),
+            high=np.array(high * 6),
             dtype=np.float64
         )
 
+        self.action_low = np.array([self.hardware.min["left"], self.hardware.min["right"]]*3)
+        self.action_high = np.array([self.hardware.max["left"], self.hardware.max["right"]]*3)
         # current joint angles
         # the joint velocities,
         # the sine and cosine values of the object’s angle,
         # the last action, the error between the goal and the current object angle
 
         self.observation_space = spaces.Box(
-            low=np.array([
-                *[self.hardware.min['left'], self.hardware.min['right']] * 3,
-                *[-2 * np.pi] * 6,
-                -1, -1,
-                *[self.hardware.min['left'], self.hardware.min['right']] * 3,
-                -2 *np.pi]),
-            high=np.array([
-                *[self.hardware.max['left'], self.hardware.max['right']] * 3,
-                *[2 * np.pi] * 6,
-                1, 1,
-                *[self.hardware.max['left'], self.hardware.max['right']] * 3,
-                2 * np.pi]),
+            low=np.array(low * 21),
+            high=np.array(high * 21),
             dtype=np.float64
         )
+
+        self.observation_low  = np.array([
+            *self.action_low,
+            *(self.action_low - self.action_high),
+            -1, -1, 
+            *self.action_low,
+            -2 *np.pi
+        ])
+
+        self.observation_high  = np.array([
+            *self.action_high,
+            *(self.action_high - self.action_low),
+            1, 1, 
+            *self.action_high,
+            2 *np.pi
+        ])
+        
 
         self.action_size = self.action_space.shape[0]
         self.observation_size = self.observation_space.shape[0]
@@ -59,23 +68,39 @@ class SoftFingerModulesEnv(gym.Env):
         theta_dot_joints = theta_joints - self.last_pos # TODO: Add instantaneous velocity
         last_action = self.last_action
         dtheta_obj = theta_t_obj - self.goal_theta
-        print(f"Obj position: {dtheta_obj}")
-        state = np.array([*theta_joints, 
+        state = np.array(self.env_observation([*theta_joints, 
                            *theta_dot_joints,
                            *theta_t_obj_sincos,
                            *last_action,
-                           dtheta_obj])
+                           dtheta_obj]))
+        # print(f"State: {state}")
         return state 
 
+    def env_action(self, action):
+        env_action = -1 + (action - self.action_low) * 2/(self.action_high - self.action_low)
+        return env_action
+
+    def hardware_action(self, action):
+        hardware_action = self.action_low + (action + 1) * (self.action_high - self.action_low)/2
+        return hardware_action
+
+    def env_observation(self, obs):
+        env_obs = -1 + (obs - self.observation_low) * 2/(self.observation_high - self.observation_low)
+        return env_obs
+
+    def hardware_observation(self, obs):
+        hardware_obs = self.observation_low + (obs + 1) * (self.observation_high - self.observation_low)/2
+        return hardware_obs
      
     def step(self, action, thresh=0.05):
         time.sleep(0.1)
-        # print(action)
-        self.hardware.all_move(action)
+        # print(f"Action: {action}")
+
+        self.hardware.all_move(self.hardware_action(action))
         self.last_action = action
         self.last_pos = self.hardware.get_pos_fingers()
         state = self._get_obs()
-        reward = self.reward(state)
+        reward = self.reward(self.hardware_observation(state))
         err = np.abs(self.object_pos - self.goal_theta)
         done = err < thresh
         print(f"Step: {next(self.counter)}, Reward: {reward}, Done: {done}\n")
@@ -137,17 +162,5 @@ gym.envs.register(
 )
 
 env_name = 'SoftFingerModulesEnv-v0'
-
-if __name__ == "__main__":
-
-    env = gym.make(env_name)
-    env.reset()
-    for i in range(100):
-        action = env.action_space.sample()
-        env.step(action)
-        print(env.last_pos - action)
-        input("Press any key to continue.")
-
-    env.reset()
 
 
