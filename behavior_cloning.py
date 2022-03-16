@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
-
+import module_env, gym
 
 
 # Define model
@@ -26,8 +26,20 @@ class NeuralNetwork(nn.Module):
 
 
 class ExpertDataset(Dataset):
-    def __init__(self, file="20e_rewrap.npz"):
-        self.data =  np.load(file)
+    def __init__(self, env):
+        import tkinter
+        import tkinter.filedialog as filedialog
+        tkinter.Tk().withdraw()
+        self.data =  [np.load(f) for f in filedialog.askopenfilenames()]
+        merged_data = {}
+        for data in self.data:
+            for k,v in data.items():
+                merged_data.update({k:v})
+        self.data = merged_data
+        for i, point in enumerate(self.data["actions"]):
+            self.data["actions"][i] = env.env_action(point)
+        for i, point in enumerate(self.data["obs"]):
+            self.data["obs"][i] = env.env_observation(point)
         self.obs_size = len(self.data["obs"][0])
         self.actions_size = len(self.data["actions"][0])
     
@@ -54,33 +66,35 @@ def train(dataloader, model, loss_fn, optimizer):
         loss.backward()
         optimizer.step()
 
-        if batch % 1 == 0:
+        if batch % 25 == 0:
             loss, current = loss.item(), batch * len(X)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using {device} device")
-    dataset = ExpertDataset()
+    env = gym.make(module_env.env_name)
+    dataset = ExpertDataset(env)
     input_size = dataset.obs_size
     output_size = dataset.actions_size
     dataloader = DataLoader(dataset, batch_size=3)
     model = NeuralNetwork(input_size, output_size).to(device)
 
     loss_fn = nn.MSELoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
-    for i in range(10):
+    for i in range(3):
+        rate = 0.001 / ((i+1) ** 2 )
+        print(rate)
+        optimizer = torch.optim.SGD(model.parameters(), lr=rate)
         train(dataloader, model, loss_fn, optimizer)
     
     global trained
     trained = True
-    import module_env, gym
-    env = gym.make(module_env.env_name)
     obs = env.reset()
+    print(obs)
     for i in range(200):
         obs = torch.from_numpy(np.array([obs])).float().to(device)
         action = model(obs)
-        action = action.cpu().detach().numpy()
+        action = action.cpu().detach().numpy() + 0.2 * np.random.rand(env.action_space.shape[0])
         obs, reward, done, _ = env.step(action[0])
         print(action)
 

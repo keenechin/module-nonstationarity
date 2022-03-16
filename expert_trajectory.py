@@ -6,13 +6,14 @@ import gym
 
 
 
-def generate_expert_traj(env, n_episodes=20):
-    actions = []
-    observations = []
-    rewards = []
+def generate_expert_traj(env, n_episodes=3, expected_ep_ln=50):
+    actions = [None] * n_episodes * expected_ep_ln
+    observations = [None] * n_episodes * expected_ep_ln
+    rewards = [None] * n_episodes * expected_ep_ln
     episode_returns = np.zeros((n_episodes,))
-    episode_starts = []
+    episode_starts = [None] * n_episodes * expected_ep_ln
 
+    total_idx = 0
     ep_idx = 0
     obs = env.reset()
     episode_starts.append(True)
@@ -24,7 +25,7 @@ def generate_expert_traj(env, n_episodes=20):
     with ExpertActionStream(manipulator=env, target_theta=0) as action_listener:
         obj, process, action_channel, state_channel = action_listener
 
-        while process.is_alive() and ep_idx < n_episodes:
+        while process.is_alive():
             try:
                 command = action_channel.get(False)
                 try:
@@ -33,10 +34,21 @@ def generate_expert_traj(env, n_episodes=20):
                     while not state_channel.empty():
                         state_channel.get()
                     state_channel.put(env.object_pos)
-                    observations.append(obs)
-                    actions.append(action)
-                    rewards.append(reward)
-                    episode_starts.append(done)
+
+
+                    try:
+                        observations[total_idx] = obs                    
+                        actions[total_idx] = action
+                        rewards[total_idx] = reward
+                        episode_starts[total_idx] = done
+                    except IndexError:
+                        observations.append(obs)
+                        actions.append(action)
+                        rewards.append(reward)
+                        episode_starts.append(done)
+
+                    total_idx += 1
+
                     reward_sum += reward
 
                     if done:
@@ -44,6 +56,8 @@ def generate_expert_traj(env, n_episodes=20):
                         episode_returns[ep_idx] = reward_sum
                         reward_sum = 0.0
                         ep_idx += 1
+                        if ep_idx >= n_episodes:
+                            break
 
 
                 except TypeError:
@@ -55,11 +69,17 @@ def generate_expert_traj(env, n_episodes=20):
         if ep_idx < n_episodes:
             raise RuntimeError(f"Expert stream closed after {ep_idx} episodes, expected {n_episodes}.")
 
+        while actions[-1] is None:
+            actions.pop()
+            observations.pop()
+            rewards.pop()
+            episode_starts.pop()
+
         actions = np.array(actions)
         observations = np.array(observations)
         rewards = np.array(rewards)
-        episode_returns = np.array(episode_returns)
         episode_starts = np.array(episode_starts)
+        episode_returns = np.array(episode_returns)
         numpy_dict = {
             'actions': actions,
             'obs': observations,
@@ -72,7 +92,7 @@ def generate_expert_traj(env, n_episodes=20):
             print(key, val.shape)
 
         prompt = "Name these trajectories:"
-        save_path = f"{n_episodes}e_{input(prompt)}"
+        save_path = f"trajectories/{n_episodes}e_{input(prompt)}"
         if save_path is not None:
             np.savez(save_path, **numpy_dict)
 
