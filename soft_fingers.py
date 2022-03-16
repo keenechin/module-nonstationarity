@@ -23,38 +23,80 @@ class SoftFingerModules():
         range = 2.1
         self.min = {"left": self.mid -  3 * range/4, "right": self.mid - range/4}
         self.max = {"left": self.mid + range/4, "right": self.mid + 3 *range/4}
-        self.finger_default = (self.min["left"], self.max["right"])
-        self.theta_joints_nominal = np.array(self.finger_default * 3)
-        self.theta_obj_nominal = np.pi
-        # self.theta_joints_nominal = np.array([self.mid] * 6)
-        self.random = np.random.RandomState(118342328)
+        self.action_low = np.array([self.min["left"], self.min["right"]]*3)
+        self.action_high = np.array([self.max["left"], self.max["right"]]*3)
+        # current joint angles
+        # the joint velocities,
+        # the sine and cosine values of the object’s angle,
+        # the last action, the error between the goal and the current object angle
+        self.observation_low  = np.array([
+            *self.action_low,
+            *(self.action_low - self.action_high),
+            -1, -1, 
+            *self.action_low,
+            -2 *np.pi
+        ])
+
+        self.observation_high  = np.array([
+            *self.action_high,
+            *(self.action_high - self.action_low),
+            1, 1, 
+            *self.action_high,
+            2 *np.pi
+        ])
+
+        finger_default = (self.min["left"], self.max["right"])
+        self.theta_joints_nominal = self.env_action(np.array(finger_default * 3))
+
+        # self.random = np.random.RandomState(118342328)
+        self.random = np.random
 
         time.sleep(0.1)
         self.reset()
     
     def wrap(self, angle):
-        return np.arctan2(np.sin(angle), np.cos(angle))
+        """Maps angle in radians to [-1, 1] """
+        return np.arctan2(np.sin(angle), np.cos(angle)) / np.pi
+    
+    def unwrap(self, angle):
+        """Maps [-1, 1] to [0, 2pi] """
+        return np.mod(angle * np.pi + 2*np.pi, 2*np.pi) 
+
+    def env_action(self, action):
+        env_action = -1 + (action - self.action_low) * 2/(self.action_high - self.action_low)
+        return env_action
+
+    def hardware_action(self, action):
+        hardware_action = self.action_low + (action + 1) * (self.action_high - self.action_low)/2
+        return hardware_action
+
+    def env_observation(self, obs):
+        env_obs = -1 + (obs - self.observation_low) * 2/(self.observation_high - self.observation_low)
+        return env_obs
+
+    def hardware_observation(self, obs):
+        hardware_obs = self.observation_low + (obs + 1) * (self.observation_high - self.observation_low)/2
+        return hardware_obs
 
     def reset(self):
-        self.all_move(self.theta_joints_nominal)
+        self.hardware_move(self.theta_joints_nominal)
         self.move_obj_random()
-        # self.servos.engage_motor(self.object_id, True)
-        # self.move_object(self.mid)
-        # self.servos.engage_motor(self.object_id, False)
 
     def move_object(self, pos, err_thresh=0.1):
+        print(pos)
+        self.servos.engage_motor(self.object_id, True)
         errs = np.array([np.inf] * 1)
-        self.servos.set_des_pos([self.servos.motor_id[-1]], [pos])
+        self.servos.set_des_pos([self.servos.motor_id[-1]], [self.unwrap(pos)])
         while np.any(errs > err_thresh):
             curr = self.get_pos_obj()
-            errs = np.abs(curr - self.wrap(pos))
-        self.object_pos = self.wrap(curr[0])
+            errs = np.abs(curr - pos)
+        self.object_pos = curr[0]
+        print(self.object_pos)
+        self.servos.engage_motor(self.object_id, False)
 
     def move_obj_random(self):
-        self.servos.engage_motor(self.object_id, True)
-        pos = self.random.uniform(0, 2*np.pi)
+        pos = self.random.uniform(-1, 1)
         self.move_object(pos) 
-        self.servos.engage_motor(self.object_id, False)
 
     def finger_delta(self, finger_num, dir, mag=0.15):
         movements = {"up": np.array([mag, -mag]),
@@ -68,7 +110,8 @@ class SoftFingerModules():
         left = (finger_num)*2
         right = (finger_num)*2+2
         pos[left: right] = pos[left: right] + delta
-        return pos
+        action = np.clip(pos, -1, 1)
+        return action
 
     def finger_move(self, finger_num, finger_pos):
         assert finger_num in [0, 1, 2]
@@ -76,14 +119,11 @@ class SoftFingerModules():
         right = (finger_num)*2+2
         pos = self.get_pos_fingers()
         pos[left:right] = finger_pos
-        return pos
+        action = np.clip(pos, -1, 1)
+        return action
 
-    def all_move(self, pos, err_thresh=0.05, derr_thresh=0.1, timeout=0.2):
-        for i in range(len(pos)): 
-            if i%2 == 0:
-                pos[i] = np.clip(pos[i], self.min['left'], self.max['left'])
-            else:
-                pos[i] = np.clip(pos[i], self.min['right'], self.max['right'])
+    def hardware_move(self, pos, err_thresh=0.05, derr_thresh=0.1, timeout=0.2):
+        pos = self.hardware_action(pos)
         self.servos.set_des_pos(self.servos.motor_id[:-1], pos)
         errs = np.array([np.inf] * 6)
         last_errs = np.array([np.inf] * 6)
@@ -103,16 +143,15 @@ class SoftFingerModules():
                 
             if  timedout and np.any(not_improving):
                 break 
-        # print(errs)
         self.object_pos = self.get_pos_obj()[0]
             
     def get_pos_all(self):
-        pos =  self.servos.get_pos(self.servos.motor_id)
-        pos[-1] = self.wrap(pos[-1])
+        pos =  [*self.get_pos_fingers(), *self.get_pos_obj()]
+        print(pos)
         return pos
     
     def get_pos_fingers(self):
-        return self.servos.get_pos(self.servos.motor_id[:-1])
+        return self.env_action(self.servos.get_pos(self.servos.motor_id[:-1]))
 
     def get_pos_obj(self):
         return self.wrap(self.servos.get_pos([self.servos.motor_id[-1]]))
@@ -151,13 +190,13 @@ class ExpertActionStream():
             try:
                 if key == pygame.K_1:
                     command = {'func': 'move', 'params': (
-                        0, self.manipulator.finger_default)}
+                        0, self.manipulator.theta_joints_nominal[0:2])}
                 elif key == pygame.K_2:
                     command = {'func': 'move', 'params': (
-                        1, self.manipulator.finger_default)}
+                        1, self.manipulator.theta_joints_nominal[2:4])}
                 elif key == pygame.K_3:
                     command = {'func': 'move', 'params': (
-                        2, self.manipulator.finger_default)}
+                        2, self.manipulator.theta_joints_nominal[4:6])}
             except AttributeError:
                 pass
 
@@ -258,8 +297,8 @@ class ExpertActionStream():
             current_error = current_angle - target_angle
             if current_angle > 0:
                 plus = '+'
-            text_current = font.render(f"Current angular error: {current_error} rad", True, white, (0,0,0))
-            text_target = font.render(f"                Target angle: {target_angle} rad", True, white, (0,0,0))
+            text_current = font.render(f"Current angular error: {current_error}\u03C0 rad", True, white, (0,0,0))
+            text_target = font.render(f"                Target angle: {target_angle}\u03C0 rad", True, white, (0,0,0))
             targetRect = text_target.get_rect()
             currentRect = text_current.get_rect()
             targetRect = (width//10, height//2 + fontsize) 
@@ -309,7 +348,7 @@ if __name__ == "__main__":
                 command = action_channel.get(False)
                 try:
                     pos = obj.parse(command)
-                    manipulator.all_move(pos)
+                    manipulator.hardware_move(pos)
                     while not state_channel.empty():
                         state_channel.get()
                     state_channel.put(manipulator.object_pos)
