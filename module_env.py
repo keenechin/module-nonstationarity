@@ -1,4 +1,4 @@
-from soft_fingers import SoftFingerModules, ExpertActionStream
+from soft_fingers import SoftFingerModules
 import gym
 from gym import spaces
 from gym.utils import seeding
@@ -117,6 +117,7 @@ class SoftFingerModulesEnv(gym.Env):
     def reset(self):
         self.steps = 0
         self.hardware.reset()
+        self.hardware.move_obj_random()
         return self._get_obs()
 
 gym.envs.register(

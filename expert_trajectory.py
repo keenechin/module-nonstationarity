@@ -1,5 +1,5 @@
 from queue import Empty
-from soft_fingers import ExpertActionStream, SoftFingerModules
+from manual_controller import ExpertActionStream
 import numpy as np
 import module_env
 import gym

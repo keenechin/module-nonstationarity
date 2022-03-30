@@ -6,7 +6,7 @@ import tkinter as tk
 tk.Tk().withdraw()
 env =  gym.make(module_env.env_name)
 # policy_fname = tk.filedialog.askopenfilename()
-policy_fname = "policies/PPO_policy_N32768.zip"
+policy_fname = "policies/PPO_policy_N65536.zip"
 policy = PPO.load(policy_fname)
 obs = env.reset()
 steps_to_complete = 0
