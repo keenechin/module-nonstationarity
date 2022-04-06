@@ -1,6 +1,7 @@
 from queue import Empty
 from manual_controller import ExpertActionStream
 import numpy as np
+import discrete_module_env
 import module_env
 import gym
 

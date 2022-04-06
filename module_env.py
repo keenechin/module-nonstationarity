@@ -37,6 +37,10 @@ class SoftFingerModulesEnv(gym.Env):
         self.goal_theta = goal_theta
         self.counter = self.counter_gen()
 
+        self.manual_funcs = {'move': self.finger_move,
+                    'delta': self.finger_delta,
+                    'idle': self.get_pos_fingers}
+
     def counter_gen(self, start=0):
         while True:
             yield start

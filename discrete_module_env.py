@@ -3,7 +3,7 @@ import gym
 from gym import spaces
 import numpy as np
 
-class DiscreteModuleEnv(gym.Env):
+class DiscreteModulesEnv(gym.Env):
     def __init__(self, goal_theta=0):
         self.goal_theta = goal_theta
         self.hardware = SoftFingerModules()
@@ -110,8 +110,16 @@ class DiscreteModuleEnv(gym.Env):
         self.hardware.move_obj_random()
         return self._get_obs()
 
+gym.envs.register(
+    id='DiscreteModulesEnv-v0',
+    entry_point='discrete_module_env:DiscreteModulesEnv',
+    kwargs={}
+)
+
+env_name = 'DiscreteModulesEnv-v0'
+
 if __name__ == "__main__":
-    env = DiscreteModuleEnv()
+    env = DiscreteModulesEnv()
     import time
     for i in range(15):
         env.step(i)

@@ -7,9 +7,7 @@ class ExpertActionStream():
     def __init__(self, manipulator, target_theta):
         self.manipulator = manipulator
         self.target_theta = target_theta
-        self.func_names = {'move': manipulator.finger_move,
-                    'delta': manipulator.finger_delta,
-                    'idle': manipulator.get_pos_fingers}
+        self.func_names = manipulator.manual_funcs
 
     def parse(self, command):
         func_name = command['func']
