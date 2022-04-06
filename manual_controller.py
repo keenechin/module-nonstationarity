@@ -79,13 +79,20 @@ class ExpertActionStream():
         textRect3 = (0, 3*fontsize)
         quitRect = text_quit.get_rect()
         quitRect = (0,0)
+        window.fill(white)
+        window.blit(text1, textRect1)
+        window.blit(text2, textRect2)
+        window.blit(text3, textRect3)
+        window.blit(text_quit, quitRect)
+        window.blit(target_pic, ((width*2)//3, height//3))
+        white_square = pygame.Surface((550, fontsize*2.2)).convert()
+        white_square.fill(white)
 
-
+        targetRect = (width//10, height//2 + fontsize) 
+        currentRect = (width//10, height//2)
         current_angle = np.around(self.manipulator.object_pos, 3)
-        clock = pygame.time.Clock()
         run = True
         while run:
-            clock.tick(5)
             try:
                 current_angle = self.state_channel.get_nowait()
                 current_angle = np.around(current_angle, 3)
@@ -93,22 +100,12 @@ class ExpertActionStream():
                 pass
             target_angle = np.around(self.target_theta, 3)
             current_error = current_angle - target_angle
-            if current_angle > 0:
-                plus = '+'
-            text_current = font.render(f"Current angular error: {current_error}\u03C0 rad", True, white, (0,0,0))
+            text_current = font.render(f"Current angular error: {current_error}\u03C0 rad", True, white, (0,0,0)).convert()
             text_target = font.render(f"                Target angle: {target_angle}\u03C0 rad", True, white, (0,0,0)).convert()
-            targetRect = text_target.get_rect()
-            currentRect = text_current.get_rect()
-            targetRect = (width//10, height//2 + fontsize) 
-            currentRect = (width//10, height//2)
-            window.fill(white)
+
+            window.blit(white_square, (width//10, height//2))
             window.blit(text_target, targetRect)
             window.blit(text_current, currentRect)
-            window.blit(text1, textRect1)
-            window.blit(text2, textRect2)
-            window.blit(text3, textRect3)
-            window.blit(text_quit, quitRect)
-            window.blit(target_pic, ((width*2)//3, height//3))
             
             pygame.display.update()
             for event in pygame.event.get():
