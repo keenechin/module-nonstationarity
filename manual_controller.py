@@ -7,76 +7,33 @@ class ExpertActionStream():
     def __init__(self, manipulator, target_theta):
         self.manipulator = manipulator
         self.target_theta = target_theta
-        self.func_names = manipulator.manual_funcs
-
-    def parse(self, command):
-        func_name = command['func']
-        assert func_name in self.func_names
-        func = self.func_names[func_name]
-        params = command['params']
-        if params is not None:
-            action = func(*params)
-        else:
-            action = func()
-        return action
-
+        self.key_map = {
+            pygame.K_w : 0,
+            pygame.K_s : 1, 
+            pygame.K_a : 2,
+            pygame.K_d : 3,
+            pygame.K_i : 4,
+            pygame.K_k : 5, 
+            pygame.K_j : 6,
+            pygame.K_l : 7,
+            pygame.K_UP : 8,
+            pygame.K_DOWN : 9, 
+            pygame.K_LEFT : 10,
+            pygame.K_RIGHT : 11,
+            pygame.K_1 : 12,
+            pygame.K_2 : 13,
+            pygame.K_3 : 14,
+        }
 
     def get_listener_funcs(self, queue):
         def on_press(key):
-            command = {'func': 'idle', 'params': None}
-
-            if key == pygame.K_4:
-                command = {'func': 'idle', 'params': None}
-
             try:
-                if key == pygame.K_1:
-                    command = {'func': 'move', 'params': (
-                        0, self.manipulator.theta_joints_nominal[0:2])}
-                elif key == pygame.K_2:
-                    command = {'func': 'move', 'params': (
-                        1, self.manipulator.theta_joints_nominal[2:4])}
-                elif key == pygame.K_3:
-                    command = {'func': 'move', 'params': (
-                        2, self.manipulator.theta_joints_nominal[4:6])}
-            except AttributeError:
+                command = self.key_map[key]
+                while not queue.empty():
+                    queue.get()
+                queue.put(command)
+            except KeyError:
                 pass
-
-            try:
-                if key == pygame.K_w:
-                    command = {'func': 'delta', 'params': (0, 'up')}
-                elif key == pygame.K_s:
-                    command = {'func': 'delta', 'params': (0, 'down')}
-                elif key == pygame.K_a:
-                    command = {'func': 'delta', 'params': (0, 'left')}
-                elif key == pygame.K_d:
-                    command = {'func': 'delta', 'params': (0, 'right')}
-            except AttributeError:
-                pass
-
-            try:
-                if key == pygame.K_i:
-                    command = {'func': 'delta', 'params': (1, 'up')}
-                elif key == pygame.K_k:
-                    command = {'func': 'delta', 'params': (1, 'down')}
-                elif key == pygame.K_j:
-                    command = {'func': 'delta', 'params': (1, 'left')}
-                elif key == pygame.K_l:
-                    command = {'func': 'delta', 'params': (1, 'right')}
-            except AttributeError:
-                pass
-
-            if key == pygame.K_UP:
-                command = {'func': 'delta', 'params': (2, 'up')}
-            elif key == pygame.K_DOWN:
-                command = {'func': 'delta', 'params': (2, 'down')}
-            elif key == pygame.K_LEFT:
-                command = {'func': 'delta', 'params': (2, 'left')}
-            elif key == pygame.K_RIGHT:
-                command = {'func': 'delta', 'params': (2, 'right')}
-
-            while not queue.empty():
-                queue.get()
-            queue.put(command)
 
             return True
 
@@ -139,7 +96,7 @@ class ExpertActionStream():
             if current_angle > 0:
                 plus = '+'
             text_current = font.render(f"Current angular error: {current_error}\u03C0 rad", True, white, (0,0,0))
-            text_target = font.render(f"                Target angle: {target_angle}\u03C0 rad", True, white, (0,0,0))
+            text_target = font.render(f"                Target angle: {target_angle}\u03C0 rad", True, white, (0,0,0)).convert()
             targetRect = text_target.get_rect()
             currentRect = text_current.get_rect()
             targetRect = (width//10, height//2 + fontsize) 

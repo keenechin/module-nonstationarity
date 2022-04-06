@@ -30,7 +30,7 @@ def generate_expert_traj(env, n_episodes=3, expected_ep_ln=50):
             try:
                 command = action_channel.get(False)
                 try:
-                    action = obj.parse(command)
+                    action = env.interpret(command)
                     obs, reward, done, _ = env.step(action)
                     while not state_channel.empty():
                         state_channel.get()
@@ -98,5 +98,5 @@ def generate_expert_traj(env, n_episodes=3, expected_ep_ln=50):
             np.savez(save_path, **numpy_dict)
 
 if __name__ == "__main__":
-    env = gym.make(module_env.env_name)
+    env = gym.make(discrete_module_env.env_name)
     generate_expert_traj(env)

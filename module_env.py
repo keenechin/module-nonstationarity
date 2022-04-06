@@ -6,6 +6,7 @@ import numpy as np
 import time
 
 
+
 class SoftFingerModulesEnv(gym.Env):
     def __init__(self, goal_theta = 0):
         self.hardware = SoftFingerModules()
@@ -37,9 +38,16 @@ class SoftFingerModulesEnv(gym.Env):
         self.goal_theta = goal_theta
         self.counter = self.counter_gen()
 
-        self.manual_funcs = {'move': self.finger_move,
-                    'delta': self.finger_delta,
-                    'idle': self.get_pos_fingers}
+        # self.manual_funcs = {'move': self.finger_move,
+        #             'delta': self.finger_delta,
+        #             'idle': self.get_pos_fingers}
+        self.action_map = []
+        for finger in range(3):
+            for dir in ("up", "down", "left", "right"):
+                self.action_map.append((finger, dir)) 
+        for finger in range(3):
+            self.action_map.append((finger, self.hardware.theta_joints_nominal[finger *2 : (finger+1)*2]))
+      
 
     def counter_gen(self, start=0):
         while True:
@@ -123,8 +131,16 @@ class SoftFingerModulesEnv(gym.Env):
         self.hardware.reset()
         self.hardware.move_obj_random()
         return self._get_obs()
+        
+    def interpret(self, command):
+        params = self.action_map[command]
+        if command < 12:
+            action = self.hardware.finger_delta(*params)
+        elif command < 15:
+            action = self.hardware.finger_move(*params)
+        return action
 
-gym.envs.register(
+    gym.envs.register(
     id='SoftFingerModulesEnv-v0',
     entry_point='module_env:SoftFingerModulesEnv',
     kwargs={}

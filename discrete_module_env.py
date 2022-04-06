@@ -20,7 +20,7 @@ class DiscreteModulesEnv(gym.Env):
             for dir in ("up", "down", "left", "right"):
                 self.action_map.append((finger, dir))
         self.action_map = tuple(self.action_map)
-        self.action_size = self.action_space.shape
+        self.action_size = self.action_space.n
         self.observation_size = self.observation_space.shape[0]
         self.last_action = 0
         self.last_pos = self.theta_joints_nominal
@@ -43,16 +43,19 @@ class DiscreteModulesEnv(gym.Env):
         return state
 
     def step(self, action, thresh = 0.1/np.pi):
+        self.last_pos = self.get_pos_fingers()
         self.last_action = action/14
         if action < 12:
             finger, dir = self.action_map[action]
             action = self.hardware.finger_delta(finger, dir)
-        else:
+        elif action < 15:
             finger = action-12
             action = self.hardware.finger_move(finger, 
                      self.theta_joints_nominal[finger *2 : (finger+1)*2]) 
+        else:
+            print("Invalid action")
+            action = self.last_pos
         self.hardware.hardware_move(action)
-        self.last_pos = self.get_pos_fingers()
         state = self._get_obs()
         reward = self.reward(state)
         err = np.abs(self.object_pos - self.goal_theta)
@@ -86,6 +89,12 @@ class DiscreteModulesEnv(gym.Env):
                 -0*np.linalg.norm(theta_dot_joints) \
                 + 10 * self.one_if(np.abs(dtheta_obj), thresh=0.25/np.pi) \
                 + 50 * self.one_if(np.abs(dtheta_obj), thresh=0.10/np.pi)
+    
+    def interpret(self, command: int):
+        if not command in range(self.action_size):
+            action = None 
+        action = command
+        return action
 
     @property
     def object_pos(self):
