@@ -23,6 +23,8 @@ class SoftFingerModules():
         self.max = {"left": self.mid + range/4, "right": self.mid + 3 *range/4}
         self.action_low = np.array([self.min["left"], self.min["right"]]*3)
         self.action_high = np.array([self.max["left"], self.max["right"]]*3)
+        # self.action_low = np.array([0])
+        # self.action_high = np.array([1])
         # current joint angles
         # the joint velocities,
         # the sine and cosine values of the object’s angle,
@@ -77,8 +79,11 @@ class SoftFingerModules():
         return hardware_obs
 
     def reset(self):
+        self.servos.engage_motor(self.object_id, True)
         self.hardware_move(self.theta_joints_nominal)
+        self.move_object(1)
         self.servos.engage_motor(self.object_id, False)
+    
 
     def move_object(self, pos, err_thresh=0.1):
         self.servos.engage_motor(self.object_id, True)
@@ -95,7 +100,7 @@ class SoftFingerModules():
         pos = self.random.uniform(-1, 1)
         self.move_object(pos) 
 
-    def finger_delta(self, finger_num, dir, mag=0.15):
+    def finger_delta(self, finger_num, dir, mag=0.3):
         movements = {"up": np.array([mag, -mag]),
                      "down": np.array([-mag, mag]),
                      "left": np.array([mag, mag]),

@@ -42,9 +42,9 @@ class DiscreteModulesEnv(gym.Env):
         # print(f"State: {state}")
         return state
 
-    def step(self, action, thresh = 0.1/np.pi):
+    def step(self, action, thresh = 0.3/np.pi):
+        self.last_action = self.env_action(action)
         self.last_pos = self.get_pos_fingers()
-        self.last_action = action/14
         if action < 12:
             finger, dir = self.action_map[action]
             action = self.hardware.finger_delta(finger, dir)
@@ -112,12 +112,18 @@ class DiscreteModulesEnv(gym.Env):
 
     def get_pos_fingers(self):
         return self.hardware.get_pos_fingers()
+
+    def env_observation(self, obs):
+        return self.hardware.env_observation(obs)
+    
+    def env_action(self, action):
+        return action/self.action_size
         
     def reset(self):
         self.steps = 0
         self.hardware.reset()
-        self.hardware.move_obj_random()
         return self._get_obs()
+    
 
 gym.envs.register(
     id='DiscreteModulesEnv-v0',
