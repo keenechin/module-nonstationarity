@@ -1,12 +1,12 @@
 from locale import normalize
-import module_env
+import discrete_module_env
 import gym
 from stable_baselines3 import DDPG, PPO
 from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
 import time
 
-hardware_env = gym.make(module_env.env_name)
+hardware_env = gym.make(discrete_module_env.env_name)
 save = True
 ddpg = False
 if ddpg:
