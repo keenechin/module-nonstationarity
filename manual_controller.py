@@ -116,8 +116,6 @@ class ExpertActionStream():
                 elif event.type == pygame.KEYUP:
                     run = on_release(event.key)
 
-
-
     def __enter__(self):
         self.action_channel = Queue()
         self.state_channel = Queue()
@@ -130,4 +128,3 @@ class ExpertActionStream():
     def __exit__(self, exc_type, exc_value, exc_traceback):
         print("Closing keyboard listener.")
         self.listener_process.terminate()
-

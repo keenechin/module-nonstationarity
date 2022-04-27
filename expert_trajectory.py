@@ -7,7 +7,7 @@ import gym
 
 
 
-def generate_expert_traj(env, n_episodes=3, expected_ep_ln=50):
+def generate_expert_traj(env, n_episodes=10, expected_ep_ln=50):
     actions = [None] * n_episodes * expected_ep_ln
     observations = [None] * n_episodes * expected_ep_ln
     rewards = [None] * n_episodes * expected_ep_ln
@@ -99,4 +99,4 @@ def generate_expert_traj(env, n_episodes=3, expected_ep_ln=50):
 
 if __name__ == "__main__":
     env = gym.make(discrete_module_env.env_name)
-    generate_expert_traj(env)
+    generate_expert_traj(env, n_episodes=20)

@@ -2,7 +2,10 @@ import numpy as np
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
-import module_env, gym
+import discrete_module_env
+import module_env
+import gym
+from scipy.special import softmax
 
 
 # Define model
@@ -30,18 +33,17 @@ class ExpertDataset(Dataset):
         import tkinter
         import tkinter.filedialog as filedialog
         tkinter.Tk().withdraw()
-        self.data =  [np.load(f) for f in filedialog.askopenfilenames()]
+        self.data =  [np.load(f, allow_pickle=True) for f in filedialog.askopenfilenames()]
         merged_data = {}
         for data in self.data:
             for k,v in data.items():
-                merged_data.update({k:v})
+                try:
+                    merged_data[k] = np.append(merged_data[k], v, axis=0)
+                except KeyError:
+                    merged_data.update({k:v})
         self.data = merged_data
-        for i, point in enumerate(self.data["actions"]):
-            self.data["actions"][i] = env.env_action(point)
-        for i, point in enumerate(self.data["obs"]):
-            self.data["obs"][i] = env.env_observation(point)
         self.obs_size = len(self.data["obs"][0])
-        self.actions_size = len(self.data["actions"][0])
+        self.actions_size = 15
     
     def __len__(self):
         return len(self.data["actions"])
@@ -51,52 +53,63 @@ class ExpertDataset(Dataset):
         action = self.data["actions"][idx]
         return obs, action
 
-def train(dataloader, model, loss_fn, optimizer):
-    size = len(dataloader.dataset)
+def train(dataloader, model, loss_fn):
+    num_epochs = 5
+    num_points = len(dataloader.dataset) 
+    size = num_points * num_epochs
     # model.train()
-    for batch, (X, y) in enumerate(dataloader):
-        X, y = X.to(device), y.to(device)
+    rate = 5e-3
+    for epoch in range(num_epochs):
+        print(f"LR: {rate}")
+        optimizer = torch.optim.SGD(model.parameters(), lr=rate, momentum=0.9)
+        rate = rate * 0.99
+        for batch, (X, y) in enumerate(dataloader):
+            X = X.to(device)
+            y = y.type(torch.LongTensor)
+            y = y.to(device)
 
-        # Compute prediction error
-        pred = model(X.float())
-        loss = loss_fn(pred, y.float())
+            # zero the paramete gradients
+            optimizer.zero_grad()
 
-        # Backpropagation
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            # Compute prediction error
+            pred = model(X.float())
+            loss = loss_fn(pred, y)
 
-        if batch % 25 == 0:
-            loss, current = loss.item(), batch * len(X)
-            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+            # Backpropagation
+            loss.backward()
+            optimizer.step()
+
+            if batch % 25 == 0:
+                loss, current = loss.item(), batch * len(X)
+                current = current + num_points * epoch 
+                print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using {device} device")
-    env = gym.make(module_env.env_name)
+    env = gym.make(discrete_module_env.env_name)
     dataset = ExpertDataset(env)
     input_size = dataset.obs_size
     output_size = dataset.actions_size
     dataloader = DataLoader(dataset, batch_size=3)
     model = NeuralNetwork(input_size, output_size).to(device)
 
-    loss_fn = nn.MSELoss()
-    for i in range(3):
-        rate = 0.001 / ((i+1) ** 2 )
-        print(rate)
-        optimizer = torch.optim.SGD(model.parameters(), lr=rate)
-        train(dataloader, model, loss_fn, optimizer)
+    loss_fn = nn.CrossEntropyLoss()
+    train(dataloader, model, loss_fn)
     
     global trained
     trained = True
     obs = env.reset()
     print(obs)
-    for i in range(200):
-        obs = torch.from_numpy(np.array([obs])).float().to(device)
-        action = model(obs)
-        action = action.cpu().detach().numpy() + 0.2 * np.random.rand(env.action_space.shape[0])
-        obs, reward, done, _ = env.step(action[0])
-        print(action)
+    for j in range(5):
+        for i in range(500):
+            obs = torch.from_numpy(np.array([obs])).float().to(device)
+            action = model(obs)
+            action = softmax(action.cpu().detach().numpy())
+            action = np.random.choice(range(output_size), p=action[0])
+            obs, reward, done, _ = env.step(action)
+            print(action)
+        obs = env.reset()
 
 
 
