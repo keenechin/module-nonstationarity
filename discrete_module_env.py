@@ -7,7 +7,7 @@ class DiscreteModulesEnv(gym.Env):
     def __init__(self, goal_theta=0):
         self.goal_theta = goal_theta
         self.hardware = SoftFingerModules()
-        self.action_space = spaces.Discrete(15)
+        self.action_space = spaces.Discrete(12)
         low = [-1.0]
         high = [1.0]
         self.observation_space = spaces.Box(
@@ -45,13 +45,13 @@ class DiscreteModulesEnv(gym.Env):
     def step(self, action, thresh = 0.3/np.pi):
         self.last_action = self.env_action(action)
         self.last_pos = self.get_pos_fingers()
-        if action < 12:
+        idle_fingers = set(range(3))
+        if action < self.action_size:
             finger, dir = self.action_map[action]
+            idle_fingers.remove(finger)
             action = self.hardware.finger_delta(finger, dir)
-        elif action < 15:
-            finger = action-12
-            action = self.hardware.finger_move(finger, 
-                     self.theta_joints_nominal[finger *2 : (finger+1)*2]) 
+            for idle_finger in idle_fingers:
+                action[idle_finger * 2: (idle_finger+1)*2] =  self.theta_joints_nominal[idle_finger *2 : (idle_finger+1)*2] 
         else:
             print("Invalid action")
             action = self.last_pos
@@ -87,8 +87,8 @@ class DiscreteModulesEnv(gym.Env):
         return -5 * np.abs(dtheta_obj) \
                 -0*np.linalg.norm(self.theta_joints_nominal - theta_joints) \
                 -0*np.linalg.norm(theta_dot_joints) \
-                + 10 * self.one_if(np.abs(dtheta_obj), thresh=0.25/np.pi) \
-                + 50 * self.one_if(np.abs(dtheta_obj), thresh=0.10/np.pi)
+                + 10 * self.one_if(np.abs(dtheta_obj), thresh=0.45/np.pi) \
+                + 50 * self.one_if(np.abs(dtheta_obj), thresh=0.30/np.pi)
     
     def interpret(self, command: int):
         if not command in range(self.action_size):
@@ -136,7 +136,7 @@ env_name = 'DiscreteModulesEnv-v0'
 if __name__ == "__main__":
     env = DiscreteModulesEnv()
     import time
-    for i in range(15):
+    for i in range(env.action_size):
         env.step(i)
         env.step(i)
         env.step(i)
