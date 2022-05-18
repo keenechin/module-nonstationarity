@@ -6,7 +6,7 @@ import time
 
 class SoftFingerModules():
     def __init__(self, motor_type="X",
-                 device="/dev/ttyUSB0", baudrate=57600, protocol=2, operating_torque = 80):
+                 device="/dev/ttyUSB0", baudrate=57600, protocol=2, operating_torque = 100):
 
         self.finger1_id = [42, 43]
         self.finger2_id = [40, 41]
@@ -160,6 +160,9 @@ class SoftFingerModules():
     def __del__(self):
         self.servos.engage_motor(self.servos.motor_id, False)
 
+    def interpret(self, command):
+        return None
+
 
 
 
@@ -177,8 +180,9 @@ if __name__ == "__main__":
             try:
                 command = action_channel.get(False)
                 try:
-                    pos = obj.parse(command)
-                    manipulator.hardware_move(pos)
+                    sequence = manipulator.interpret(command)
+                    for pos in sequence:
+                        manipulator.hardware_move(pos)
                     while not state_channel.empty():
                         state_channel.get()
                     state_channel.put(manipulator.object_pos)

@@ -43,7 +43,7 @@ class ExpertDataset(Dataset):
                     merged_data.update({k:v})
         self.data = merged_data
         self.obs_size = len(self.data["obs"][0])
-        self.actions_size = 15
+        self.actions_size = env.action_size
     
     def __len__(self):
         return len(self.data["actions"])
@@ -107,6 +107,8 @@ if __name__ == "__main__":
             action = model(obs)
             action = softmax(action.cpu().detach().numpy())
             action = np.random.choice(range(output_size), p=action[0])
+            if np.random.rand() < 0.2:
+                action = np.random.choice(range(env.action_size))
             obs, reward, done, _ = env.step(action)
             print(action)
         obs = env.reset()

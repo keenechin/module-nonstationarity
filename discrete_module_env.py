@@ -49,7 +49,7 @@ class DiscreteModulesEnv(gym.Env):
         if action < self.action_size:
             finger, dir = self.action_map[action]
             idle_fingers.remove(finger)
-            action = self.hardware.finger_delta(finger, dir)
+            action = self.hardware.finger_delta(finger, dir, mag=0.6)
             for idle_finger in idle_fingers:
                 action[idle_finger * 2: (idle_finger+1)*2] =  self.theta_joints_nominal[idle_finger *2 : (idle_finger+1)*2] 
         else:
