@@ -3,11 +3,12 @@ import gym
 from gym import spaces
 import numpy as np
 
-class PrimitivesModulesEnv(gym.Env):
+class PrimitivesEnv(gym.Env):
     def __init__(self, goal_theta=0):
         self.goal_theta = goal_theta
         self.hardware = SoftFingerModules()
-        self.action_space = spaces.Discrete(15)
+        self.action_size = 6
+        self.action_space = spaces.Discrete(self.action_size)
         low = [-1.0]
         high = [1.0]
         self.observation_space = spaces.Box(
@@ -15,11 +16,24 @@ class PrimitivesModulesEnv(gym.Env):
             high=np.array(high *16),
             dtype=np.float64
         )
+
         self.action_map = []
         for finger in range(3):
-            pass
+            for dir in ("up", "down", "left", "right"):
+                self.action_map.append((finger, dir))
         self.action_map = tuple(self.action_map)
-        self.action_size = self.action_space.n
+
+        self.primitive_map = [
+            [0,0,0,0],
+            [1,1,1,1],
+            [2,2,2,2],
+            [3,3,3,3],
+            [4,4,4,4],
+            [5,5,5,5]
+        ]
+        self.primitive_map = tuple(self.primitive_map)
+
+
         self.observation_size = self.observation_space.shape[0]
         self.last_action = 0
         self.last_pos = self.theta_joints_nominal
@@ -44,13 +58,18 @@ class PrimitivesModulesEnv(gym.Env):
     def step(self, action, thresh = 0.3/np.pi):
         self.last_action = self.env_action(action)
         self.last_pos = self.get_pos_fingers()
-        if action < 12:
-            finger, dir = self.action_map[action]
-            action = self.hardware.finger_delta(finger, dir)
+        if action < self.action_size:
+            for subaction in self.primitive_map[action]:
+                idle_fingers = set(range(3))
+                finger, dir = self.action_map[subaction]
+                idle_fingers.remove(finger)
+                pos = self.hardware.finger_delta(finger, dir, mag=0.6)
+                for idle_finger in idle_fingers:
+                    pos[idle_finger * 2: (idle_finger+1)*2] =  self.theta_joints_nominal[idle_finger *2 : (idle_finger+1)*2] 
         else:
             print("Invalid action")
             action = self.last_pos
-        self.hardware.hardware_move(action)
+        self.hardware.hardware_move(pos)
         state = self._get_obs()
         reward = self.reward(state)
         err = np.abs(self.object_pos - self.goal_theta)
@@ -82,8 +101,8 @@ class PrimitivesModulesEnv(gym.Env):
         return -5 * np.abs(dtheta_obj) \
                 -0*np.linalg.norm(self.theta_joints_nominal - theta_joints) \
                 -0*np.linalg.norm(theta_dot_joints) \
-                + 10 * self.one_if(np.abs(dtheta_obj), thresh=0.25/np.pi) \
-                + 50 * self.one_if(np.abs(dtheta_obj), thresh=0.10/np.pi)
+                + 10 * self.one_if(np.abs(dtheta_obj), thresh=0.45/np.pi) \
+                + 50 * self.one_if(np.abs(dtheta_obj), thresh=0.30/np.pi)
     
     def interpret(self, command: int):
         if not command in range(self.action_size):
@@ -120,19 +139,19 @@ class PrimitivesModulesEnv(gym.Env):
         return self._get_obs()
     
 
+env_name = 'PrimitivesEnv-v0'
+
 gym.envs.register(
-    id='PrimitivesModulesEnv-v0',
-    entry_point='primitives_module_env:DiscreteModulesEnv',
+    id=env_name,
+    entry_point='primitives_module_env:PrimitivesEnv',
     kwargs={}
 )
 
-env_name = 'PrimitivesModulesEnv-v0'
-
 
 if __name__ == "__main__":
-    env = PrimitivesModulesEnv()
+    env = PrimitivesEnv()
     import time
-    for i in range(15):
+    for i in range(env.action_size):
         env.step(i)
         env.step(i)
         env.step(i)
