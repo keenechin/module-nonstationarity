@@ -1,12 +1,12 @@
 from locale import normalize
-import discrete_module_env
+import primitives_module_env
 import gym
 from stable_baselines3 import DDPG, PPO
 from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
 import time
 
-hardware_env = gym.make(discrete_module_env.env_name)
+hardware_env = gym.make(primitives_module_env.env_name)
 save = True
 ddpg = False
 if ddpg:
@@ -18,7 +18,7 @@ if ddpg:
     time.sleep(100)
 elif save:
     update_steps = 64
-    for i in range(16, 17):
+    for i in range(14, 17):
         hardware_env.reset()
         learn_steps = 2 ** i
         policy = PPO('MlpPolicy', hardware_env, learning_rate=1e-3, 
@@ -29,7 +29,7 @@ elif save:
         ppo_file = f"policies/PPO_policy_N{learn_steps}"
         if save:
             policy.save(ppo_file)
-        wait = np.min((2 ** (i-4), 1800))
+        wait = np.min((2 ** (i-5), 1800))
         print(f"Cooling down for {wait/60} minutes.")
         time.sleep(wait)
     policy = PPO.load(ppo_file, print_system_info=True)

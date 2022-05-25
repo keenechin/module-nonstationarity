@@ -24,12 +24,12 @@ class PrimitivesEnv(gym.Env):
         self.action_map = tuple(self.action_map)
 
         self.primitive_map = [
-            [0,0,0,0],
-            [1,1,1,1],
-            [2,2,2,2],
-            [3,3,3,3],
-            [4,4,4,4],
-            [5,5,5,5]
+            [3,3,3, 0,0,2,2],
+            [7,7,7, 4,4,6,6],
+            [11,11,11, 8,8,10,10],
+            [2,2,2, 0,0,3,3],
+            [6,6,6, 4,4,7,7],
+            [10,10,10,  8,8,11,11]
         ]
         self.primitive_map = tuple(self.primitive_map)
 
@@ -55,21 +55,24 @@ class PrimitivesEnv(gym.Env):
         # print(f"State: {state}")
         return state
 
-    def step(self, action, thresh = 0.3/np.pi):
+    def step(self, action, thresh = 0.45/np.pi):
         self.last_action = self.env_action(action)
         self.last_pos = self.get_pos_fingers()
         if action < self.action_size:
-            for subaction in self.primitive_map[action]:
+            primitive = self.primitive_map[action]
+            # print(f"Primitive: {primitive}")
+            for subaction in primitive:
                 idle_fingers = set(range(3))
                 finger, dir = self.action_map[subaction]
                 idle_fingers.remove(finger)
-                pos = self.hardware.finger_delta(finger, dir, mag=0.6)
+                pos = self.hardware.finger_delta(finger, dir, mag=0.4)
                 for idle_finger in idle_fingers:
                     pos[idle_finger * 2: (idle_finger+1)*2] =  self.theta_joints_nominal[idle_finger *2 : (idle_finger+1)*2] 
+                    self.hardware.hardware_move(pos)
+            self.hardware.hardware_move(self.theta_joints_nominal)
         else:
             print("Invalid action")
             action = self.last_pos
-        self.hardware.hardware_move(pos)
         state = self._get_obs()
         reward = self.reward(state)
         err = np.abs(self.object_pos - self.goal_theta)

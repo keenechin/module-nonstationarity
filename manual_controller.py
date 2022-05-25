@@ -25,6 +25,15 @@ class ExpertActionStream():
             pygame.K_3 : 14,
         }
 
+        self.key_map = {
+            pygame.K_a : 0,
+            pygame.K_d : 3,
+            pygame.K_j : 1,
+            pygame.K_l : 4,
+            pygame.K_LEFT : 2,
+            pygame.K_RIGHT : 5
+        }
+
     def get_listener_funcs(self, queue):
         def on_press(key):
             try:
@@ -39,7 +48,7 @@ class ExpertActionStream():
 
         def on_release(key):
             try:
-                if key == pygame.K_ESCAPE or key == pygame.K_q:
+                if key == pygame.K_ESCAPE:
                     return False
                 else:
                     return True

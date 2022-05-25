@@ -1,8 +1,7 @@
 from queue import Empty
 from manual_controller import ExpertActionStream
 import numpy as np
-import discrete_module_env
-import module_env
+import primitives_module_env
 import gym
 
 
@@ -98,5 +97,5 @@ def generate_expert_traj(env, n_episodes=10, expected_ep_ln=50):
             np.savez(save_path, **numpy_dict)
 
 if __name__ == "__main__":
-    env = gym.make(discrete_module_env.env_name)
+    env = gym.make(primitives_module_env.env_name)
     generate_expert_traj(env, n_episodes=20)

@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
-import discrete_module_env
+import primitives_module_env
 import module_env
 import gym
 from scipy.special import softmax
@@ -54,7 +54,7 @@ class ExpertDataset(Dataset):
         return obs, action
 
 def train(dataloader, model, loss_fn):
-    num_epochs = 5
+    num_epochs = 20
     num_points = len(dataloader.dataset) 
     size = num_points * num_epochs
     # model.train()
@@ -62,7 +62,7 @@ def train(dataloader, model, loss_fn):
     for epoch in range(num_epochs):
         print(f"LR: {rate}")
         optimizer = torch.optim.SGD(model.parameters(), lr=rate, momentum=0.9)
-        rate = rate * 0.99
+        rate = rate * 0.98
         for batch, (X, y) in enumerate(dataloader):
             X = X.to(device)
             y = y.type(torch.LongTensor)
@@ -87,7 +87,7 @@ def train(dataloader, model, loss_fn):
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using {device} device")
-    env = gym.make(discrete_module_env.env_name)
+    env = gym.make(primitives_module_env.env_name)
     dataset = ExpertDataset(env)
     input_size = dataset.obs_size
     output_size = dataset.actions_size
@@ -106,8 +106,12 @@ if __name__ == "__main__":
             obs = torch.from_numpy(np.array([obs])).float().to(device)
             action = model(obs)
             action = softmax(action.cpu().detach().numpy())
-            action = np.random.choice(range(output_size), p=action[0])
+            action = np.random.choice(range(env.action_size), p=action[0])
+            if np.random.rand() < 0.2:
+                action = np.random.choice(env.action_size)
             obs, reward, done, _ = env.step(action)
+            if done:
+                obs = env.reset()
             print(action)
         obs = env.reset()
 

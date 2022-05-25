@@ -79,7 +79,6 @@ class SoftFingerModules():
         return hardware_obs
 
     def reset(self):
-        self.servos.engage_motor(self.object_id, True)
         self.hardware_move(self.theta_joints_nominal)
         self.move_object(1)
         self.servos.engage_motor(self.object_id, False)
@@ -92,8 +91,10 @@ class SoftFingerModules():
         while np.any(errs > err_thresh):
             curr = self.get_pos_obj()
             errs = np.abs(curr - pos)
+            time.sleep(0.01)
         self.object_pos = curr[0]
         print(self.object_pos)
+        time.sleep(0.2)
         self.servos.engage_motor(self.object_id, False)
 
     def move_obj_random(self):
