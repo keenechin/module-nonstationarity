@@ -7,17 +7,20 @@ import numpy as np
 import time
 
 class Logger:
-    def __init__(self, fname):
-        self.fname = fname
-        self.file = open(fname, 'w')
+    def __init__(self, rewards, transitions):
+        self.fname = rewards
+        self.reward_file = open(rewards, 'w')
+        self.transition_file = open(transitions, 'w')
         self.step = 0
         
     def print_func(self, locals, globals):
         self.step = self.step+1
-        self.file.write(f"{self.step}, {locals['rewards'][0]}\n")
+        self.reward_file.write(f"{self.step}, {locals['rewards'][0]}\n")
+        self.transition_file.write(f"{self.step}, {locals['actions'][0]}, {locals['new_obs'][0]}, {locals['rewards'][0]}, {locals['dones'][0]}\n")
     
     def __del__(self):
-        self.file.close()
+        self.reward_file.close()
+        self.transition_file.close()
 
 hardware_env = gym.make(primitives_module_env.env_name)
 save = True
@@ -31,14 +34,16 @@ if ddpg:
     time.sleep(100)
 elif save:
     update_steps = 64
-    for i in range(14, 18):
+    for i in range(6, 15):
         hardware_env.reset()
         learn_steps = 2 ** i
         policy = PPO('MlpPolicy', hardware_env, learning_rate=1e-3, 
                     verbose=2, n_steps=update_steps, batch_size=update_steps, 
                     tensorboard_log=f"policies/log_{learn_steps}")
         print(f"Training PPO with {learn_steps} steps.")
-        policy.learn(callback=Logger(f"policies/log_{learn_steps}.txt").print_func, total_timesteps=learn_steps, log_interval=1)
+        logfile = f"policies/log_{learn_steps}.txt"
+        verboselogfile = f"policies/verboselog_{learn_steps}.txt"
+        policy.learn(callback=Logger(logfile, verboselogfile).print_func, total_timesteps=learn_steps, log_interval=1)
         ppo_file = f"policies/PPO_policy_N{learn_steps}"
         if save:
             policy.save(ppo_file)

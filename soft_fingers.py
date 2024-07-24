@@ -84,16 +84,16 @@ class SoftFingerModules():
         self.servos.engage_motor(self.object_id, False)
     
 
-    def move_object(self, pos, err_thresh=0.1):
+    def move_object(self, pos, err_thresh=0.05):
         self.servos.engage_motor(self.object_id, True)
         errs = np.array([np.inf] * 1)
         self.servos.set_des_pos([self.servos.motor_id[-1]], [self.unwrap(pos)])
         while np.any(errs > err_thresh):
             curr = self.get_pos_obj()
             errs = np.abs(curr - pos)
-            time.sleep(0.01)
+            # time.sleep(0.01)
         self.object_pos = curr[0]
-        print(self.object_pos)
+        print(f"Object pos: {self.object_pos} rad")
         time.sleep(0.2)
         self.servos.engage_motor(self.object_id, False)
 
